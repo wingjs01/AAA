@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>單字吊人</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===== 開始畫面 ===== -->
+  <section id="screen-start" class="screen is-active">
+    <h1 class="title">單字吊人</h1>
+    <p class="subtitle">看中文與音標，把英文單字拼出來。<br>每拼錯一次，繩子上的人就多長一塊。</p>
+
+    <div class="difficulty-list" id="difficultyList"></div>
+
+    <div class="rules">
+      <h3>玩法</h3>
+      <ul>
+        <li>每局 <b>5 關</b>，每關一個單字。</li>
+        <li>用鍵盤或畫面上的字母猜字；猜錯 <b>6 次</b> 人就被吊死。</li>
+        <li>被吊死 → <b>通關失敗</b>，整局結束。</li>
+        <li>「提示」可揭開一個字母，但要付出一次錯誤機會。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== 遊戲畫面 ===== -->
+  <section id="screen-game" class="screen">
+
+    <header class="hud">
+      <div class="hud-item"><span class="hud-label">關卡</span><span id="hudRound" class="hud-value">1 / 5</span></div>
+      <div class="hud-item"><span class="hud-label">難度</span><span id="hudDiff" class="hud-value">簡單</span></div>
+      <div class="hud-item"><span class="hud-label">分數</span><span id="hudScore" class="hud-value">0</span></div>
+      <button id="btnQuit" class="btn btn-ghost btn-sm" type="button">放棄</button>
+    </header>
+
+    <div class="stage">
+
+      <!-- 吊人 -->
+      <div class="gallows-panel">
+        <svg id="hangman" class="hangman" viewBox="0 0 200 240" role="img" aria-label="吊人進度">
+          <!-- 絞刑架 -->
+          <g class="frame" stroke-linecap="round">
+            <line x1="20"  y1="230" x2="120" y2="230"/>
+            <line x1="55"  y1="230" x2="55"  y2="20"/>
+            <line x1="55"  y1="20"  x2="140" y2="20"/>
+            <line x1="90"  y1="20"  x2="55"  y2="55"/>
+            <line x1="140" y1="20"  x2="140" y2="45"/>
+          </g>
+          <!-- 人形：依錯誤次數逐步顯示 -->
+          <g class="victim" stroke-linecap="round">
+            <circle class="part" data-part="1" cx="140" cy="62" r="17"/>
+            <line   class="part" data-part="2" x1="140" y1="79"  x2="140" y2="140"/>
+            <line   class="part" data-part="3" x1="140" y1="95"  x2="112" y2="120"/>
+            <line   class="part" data-part="4" x1="140" y1="95"  x2="168" y2="120"/>
+            <line   class="part" data-part="5" x1="140" y1="140" x2="116" y2="185"/>
+            <line   class="part" data-part="6" x1="140" y1="140" x2="164" y2="185"/>
+            <!-- 死亡表情 -->
+            <g class="face">
+              <line x1="131" y1="56" x2="137" y2="62"/>
+              <line x1="137" y1="56" x2="131" y2="62"/>
+              <line x1="143" y1="56" x2="149" y2="62"/>
+              <line x1="149" y1="56" x2="143" y2="62"/>
+              <line x1="133" y1="71" x2="147" y2="71"/>
+            </g>
+          </g>
+        </svg>
+
+        <div class="lives">
+          <span class="lives-label">剩餘機會</span>
+          <div id="lifeDots" class="life-dots"></div>
+        </div>
+      </div>
+
+      <!-- 題目 -->
+      <div class="quiz-panel">
+        <div class="clue">
+          <div class="clue-zh" id="clueZh">蘋果</div>
+          <div class="clue-row">
+            <span class="clue-ipa" id="clueIpa">/ˈæp.əl/</span>
+            <button id="btnSpeak" class="btn btn-icon" type="button" title="聽發音" aria-label="聽發音">🔊</button>
+          </div>
+          <div class="clue-meta"><span id="clueLen">5 個字母</span></div>
+        </div>
+
+        <div id="wordSlots" class="word-slots" aria-live="polite"></div>
+
+        <div class="wrong-row">
+          <span class="wrong-label">拼錯過</span>
+          <div id="wrongLetters" class="wrong-letters"></div>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <div id="keyboard" class="keyboard"></div>
+
+        <div class="actions">
+          <button id="btnHint" class="btn btn-ghost" type="button">💡 提示（－1 次機會）</button>
+          <button id="btnSentence" class="btn btn-ghost" type="button">📖 例句</button>
+        </div>
+        <div id="sentence" class="sentence"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== 結算畫面 ===== -->
+  <section id="screen-over" class="screen">
+    <div id="overIcon" class="over-icon">💀</div>
+    <h2 id="overTitle" class="over-title">通關失敗</h2>
+    <p id="overText" class="over-text"></p>
+
+    <div class="score-card">
+      <div class="score-item"><span>總分</span><b id="finalScore">0</b></div>
+      <div class="score-item"><span>過關數</span><b id="finalCleared">0 / 5</b></div>
+      <div class="score-item"><span>全對關卡</span><b id="finalPerfect">0</b></div>
+    </div>
+
+    <div id="reviewList" class="review-list"></div>
+
+    <div class="over-actions">
+      <button id="btnRetry" class="btn btn-primary" type="button">再挑戰一次</button>
+      <button id="btnHome" class="btn btn-ghost" type="button">回到選單</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="words.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
