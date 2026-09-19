@@ -103,6 +103,7 @@ body {
 .deck-card[data-level="normal"] .dot { background: var(--accent); }
 .deck-card[data-level="hard"]   .dot { background: var(--bad); }
 .deck-card .dot-mine { background: #7aa2f7; }
+.deck-card .dot-line { background: #06c755; }
 
 .deck-card .d-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 .deck-card .d-name { font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }

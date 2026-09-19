@@ -87,6 +87,61 @@
   function renderStart() {
     renderBuiltin();
     renderMyDecks();
+    renderLineDecks();
+  }
+
+  /* ---------- LINE 題庫 ---------- */
+  function renderLineDecks() {
+    var head = $('lineHead');
+    var box = $('lineDeckList');
+    if (!Cloud.enabled()) { head.hidden = true; box.hidden = true; return; }
+
+    var st = Cloud.state();
+    head.hidden = false;
+    box.hidden = false;
+    box.innerHTML = '';
+
+    if (!st.ready) {
+      box.innerHTML = '<div class="empty-note">正在讀取你的 LINE 題庫…</div>';
+      return;
+    }
+    if (st.error) {
+      box.innerHTML = '<div class="empty-note">讀不到 LINE 題庫：' + esc(st.error) +
+        '<br>請回到 LINE 輸入 <b>/玩</b> 取得新的連結。</div>';
+      return;
+    }
+    if (!st.token) {
+      box.innerHTML = '<div class="empty-note">還沒有連結 LINE 帳號。<br>' +
+        '在 LINE 把單字或課本照片傳給 bot，再輸入 <b>/玩</b> 取得你的專屬連結。</div>';
+      return;
+    }
+    if (!st.decks.length) {
+      box.innerHTML = '<div class="empty-note">' + (st.name ? esc(st.name) + '，你' : '你') +
+        '還沒有 LINE 題庫。<br>在 LINE 輸入「/新增 課本第一課」建立一個。</div>';
+      return;
+    }
+
+    st.decks.forEach(function (deck) {
+      var rounds = Math.min(MAX_ROUNDS, deck.word_count);
+      var row = document.createElement('div');
+      row.className = 'deck-card deck-card-custom';
+      row.innerHTML =
+        '<span class="dot dot-line"></span>' +
+        '<span class="d-text">' +
+          '<span class="d-name">' + esc(deck.name) + '</span>' +
+          '<span class="d-desc">' + deck.word_count + ' 個單字・' +
+            (rounds ? '一局 ' + rounds + ' 關' : '還沒有單字') + '</span>' +
+        '</span>' +
+        '<span class="card-actions">' +
+          '<button class="btn btn-sm" data-act="play" ' + (rounds ? '' : 'disabled') + '>▶ 開始</button>' +
+        '</span>';
+      row.addEventListener('click', function (e) {
+        if (e.target.getAttribute && e.target.getAttribute('data-act') === 'play') {
+          startGame({ kind: 'cloud', deckId: deck.id, name: deck.name });
+        }
+      });
+      box.appendChild(row);
+    });
   }
 
   function renderBuiltin() {
@@ -350,6 +405,20 @@
   function startGame(source) {
     var queue, label;
 
+    if (source.kind === 'cloud') {
+      var btns = document.querySelectorAll('#lineDeckList [data-act="play"]');
+      Array.prototype.forEach.call(btns, function (b) { b.disabled = true; b.textContent = '載入中…'; });
+      Cloud.loadWords(source.deckId).then(function (words) {
+        renderLineDecks();
+        if (!words.length) { window.alert('這個題庫還沒有單字。'); return; }
+        beginGame(shuffle(words).slice(0, Math.min(MAX_ROUNDS, words.length)), source.name, source);
+      }).catch(function (err) {
+        renderLineDecks();
+        window.alert('載入題庫失敗：' + err.message);
+      });
+      return;
+    }
+
     if (source.kind === 'builtin') {
       var meta = DIFFICULTY_META[source.level];
       queue = shuffle(WORD_BANK[source.level]).slice(0, meta.rounds);
@@ -364,6 +433,10 @@
       label = deck.name;
     }
 
+    beginGame(queue, label, source);
+  }
+
+  function beginGame(queue, label, source) {
     lastSource = source;
     state = {
       source: source,
@@ -748,7 +821,15 @@
     }
   });
 
+  $('btnLineRefresh').addEventListener('click', function () {
+    Cloud.load().then(renderLineDecks);
+    renderLineDecks();
+  });
+
   /* ---------- 啟動 ---------- */
   renderStart();
   show('start');
+  if (Cloud.enabled()) {
+    Cloud.load().then(renderLineDecks).catch(function () { renderLineDecks(); });
+  }
 })();

@@ -18,6 +18,12 @@
     <div class="section-head"><span>內建字庫</span></div>
     <div class="deck-cards" id="difficultyList"></div>
 
+    <div class="section-head" id="lineHead" hidden>
+      <span>LINE 題庫</span>
+      <button id="btnLineRefresh" class="btn btn-sm" type="button">重新整理</button>
+    </div>
+    <div class="deck-cards" id="lineDeckList" hidden></div>
+
     <div class="section-head">
       <span>我的字庫</span>
       <button id="btnNewDeck" class="btn btn-sm" type="button">＋ 新增字庫</button>
@@ -190,7 +196,9 @@
 
 </div>
 
+<script src="config.js"></script>
 <script src="words.js"></script>
+<script src="cloud.js"></script>
 <script src="ipa.js"></script>
 <script src="decks.js"></script>
 <script src="game.js"></script>

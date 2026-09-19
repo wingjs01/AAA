@@ -1,0 +1,19 @@
+name = "hangman-line-bot"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 遊戲網頁的網址，bot 會用它組出你的專屬連結
+[vars]
+GAME_URL = "https://your-game-url.example.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hangman"
+database_id = "請填入 wrangler d1 create hangman 產生的 id"
+
+# 機密資訊不要寫在這個檔案，用指令設定：
+#   wrangler secret put LINE_CHANNEL_SECRET
+#   wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
+#   wrangler secret put ANTHROPIC_API_KEY
+#   wrangler secret put LIFF_CHANNEL_ID

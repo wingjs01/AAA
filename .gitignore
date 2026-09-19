@@ -1,0 +1,5 @@
+node_modules/
+server/node_modules/
+server/seed-dict.sql
+server/.wrangler/
+.DS_Store

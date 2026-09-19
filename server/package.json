@@ -1,0 +1,18 @@
+{
+  "name": "hangman-line-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/parse.test.mjs && node test/bot.test.mjs",
+    "seed:gen": "node tools/gen-dict-sql.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

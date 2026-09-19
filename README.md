@@ -44,6 +44,21 @@
 
 > 注意：字庫存在「這台裝置的這個瀏覽器」裡，不會跨裝置同步，無痕視窗也存不住。
 
+## 用 LINE 上傳單字
+
+除了在網頁上逐筆輸入，也可以透過 LINE bot 建題庫：
+
+- 在 LINE 打字傳單字（`apple 蘋果`，一行一個），或**直接拍課本照片**
+- 照片由 Claude 視覺辨識出「英文 ↔ 中文」配對，自動補音標後存入題庫
+- 以 **LINE 帳號**識別，底下可分多個題庫（課本第一課、社團第一課…）
+- 遊戲首頁會多出「LINE 題庫」區塊，直接開局
+
+這部分需要自行部署後端（Cloudflare Workers + D1），
+完整步驟見 [`server/README.md`](server/README.md)。
+
+沒有部署也完全不影響——把 `config.js` 的 `API_BASE` 留空，
+遊戲就只使用內建字庫與瀏覽器本機字庫，行為跟原本一模一樣。
+
 ## 音標是怎麼來的
 
 `ipa/` 目錄是把 [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict) 的 ARPAbet 音標
@@ -79,6 +94,9 @@ python3 -m http.server 8000
 | `decks.js` | 自建字庫的儲存、驗證、匯出還原 |
 | `ipa.js` | 音標查詢引擎（按需載入辭典分片） |
 | `ipa/a.js` … `ipa/z.js` | CMU 發音辭典轉成的 IPA 資料，共 117,449 字 |
+| `config.js` | 部署設定（後端網址、LIFF ID），不部署就留空 |
+| `cloud.js` | 讀取 LINE 題庫；後端未設定時自動停用 |
+| `server/` | LINE Bot 後端（Cloudflare Worker），見該目錄的 README |
 
 ## 改內建字庫
 
