@@ -1,0 +1,209 @@
+openapi: 3.1.0
+info:
+  title: 單字吊人 API
+  version: "1.0.0"
+  description: |
+    LINE 收單字 → 題庫 → 網頁作答。供其他專案整合。
+    客戶端：client/hangman-client.js（零相依）。整合說明：HANDOFF.md
+servers:
+  - url: https://{worker}.workers.dev
+    variables:
+      worker: { default: hangman-line-bot }
+
+components:
+  securitySchemes:
+    lineSignature: { type: apiKey, in: header, name: x-line-signature }
+    forwardKey:    { type: apiKey, in: header, name: x-forward-key }
+    ocrKey:        { type: apiKey, in: header, name: x-ocr-key }
+    webToken:      { type: apiKey, in: query,  name: t }
+  schemas:
+    Error:
+      type: object
+      properties: { error: { type: string } }
+    Word:
+      type: object
+      required: [word, zh, ipa, hint]
+      properties:
+        word: { type: string, description: "小寫，僅 a-z、空白、連字號、撇號", example: "butterfly" }
+        zh:   { type: string, description: "可為空字串", example: "蝴蝶" }
+        ipa:  { type: string, description: "自動補上，查無則空字串", example: "/ˈbʌt.ər.flaɪ/" }
+        hint: { type: string, description: "例句，可為空字串" }
+    Deck:
+      type: object
+      properties:
+        id:         { type: integer }
+        name:       { type: string, example: "課本第一課" }
+        word_count: { type: integer }
+        created_at: { type: integer, description: "epoch 毫秒" }
+    Job:
+      type: object
+      properties:
+        id:       { type: integer }
+        deckName: { type: string }
+        imageUrl: { type: string, format: uri }
+
+paths:
+  /health:
+    get:
+      summary: 健康檢查
+      security: []
+      responses:
+        "200":
+          content: { application/json: { schema: { type: object, properties: { ok: { type: boolean } } } } }
+          description: OK
+
+  /line/webhook:
+    post:
+      summary: LINE 官方 webhook
+      description: 驗證 HMAC-SHA256 簽章。由 LINE 平台呼叫，其他專案請改用 /line/forward。
+      security: [{ lineSignature: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, properties: { events: { type: array, items: { type: object } } } } } }
+      responses:
+        "200": { description: 已接受 }
+        "401": { description: 簽章驗證失敗 }
+
+  /line/forward:
+    post:
+      summary: 既有 bot 轉發事件
+      description: |
+        一個 LINE channel 只能有一個 Webhook URL。既有 bot 保留自己的 webhook，
+        把單字相關事件轉發到這裡。不驗 LINE 簽章，改以 FORWARD_KEY 驗證呼叫端。
+
+        **replyToken 只能使用一次** —— 轉發出去的事件，呼叫端不可以也回覆。
+      security: [{ forwardKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties: { events: { type: array, items: { type: object } } }
+                - type: array
+                  items: { type: object }
+                - type: object
+                  description: 單一 LINE 事件物件
+      responses:
+        "200":
+          description: 已接受
+          content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, accepted: { type: integer } } } } }
+        "400": { description: 沒有可處理的事件 }
+        "401": { description: 金鑰錯誤 }
+
+  /api/decks:
+    get:
+      summary: 取得題庫清單
+      security: [{ webToken: [] }]
+      parameters:
+        - { name: t, in: query, required: true, schema: { type: string }, description: "使用者的 web token（32 hex）" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:  { type: string }
+                  decks: { type: array, items: { $ref: "#/components/schemas/Deck" } }
+          description: OK
+        "401": { description: token 無效 }
+
+  /api/deck/{deckId}:
+    get:
+      summary: 取得題庫內的單字
+      security: [{ webToken: [] }]
+      parameters:
+        - { name: deckId, in: path, required: true, schema: { type: integer } }
+        - { name: t, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:    { type: integer }
+                  name:  { type: string }
+                  words: { type: array, items: { $ref: "#/components/schemas/Word" } }
+          description: OK
+        "401": { description: token 無效 }
+        "404": { description: 題庫不存在或不屬於這個使用者 }
+
+  /api/liff:
+    post:
+      summary: 用 LIFF idToken 換取使用者資料
+      security: []
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [idToken], properties: { idToken: { type: string } } } } }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  name:  { type: string }
+                  decks: { type: array, items: { $ref: "#/components/schemas/Deck" } }
+          description: OK
+        "401": { description: idToken 無效 }
+
+  /ocr/claim:
+    post:
+      summary: 領一份待辨識工作
+      security: [{ ocrKey: [] }]
+      responses:
+        "200":
+          content: { application/json: { schema: { type: object, properties: { job: { oneOf: [{ $ref: "#/components/schemas/Job" }, { type: "null" }] } } } } }
+          description: 有工作回 job，沒有回 null
+        "401": { description: 金鑰錯誤 }
+
+  /ocr/image/{jobId}:
+    get:
+      summary: 取得工作對應的圖片
+      description: 由 Worker 代為向 LINE 下載，呼叫端不需持有 LINE 權杖。
+      security: [{ ocrKey: [] }]
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: 圖片內容, content: { image/jpeg: { schema: { type: string, format: binary } } } }
+        "401": { description: 金鑰錯誤 }
+        "404": { description: 工作不存在 }
+        "502": { description: 向 LINE 取圖失敗 }
+
+  /ocr/result:
+    post:
+      summary: 回報辨識結果
+      security: [{ ocrKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jobId]
+              properties:
+                jobId:   { type: integer }
+                words:   { type: array, items: { type: object, properties: { word: { type: string }, zh: { type: string } } } }
+                fixes:   { type: array, items: { type: object, properties: { from: { type: string }, to: { type: string } } }, description: 辭典修正紀錄 }
+                suspect: { type: array, items: { type: string }, description: 辭典查無、請使用者檢查 }
+                error:   { type: string, description: 辨識失敗時改送這個 }
+      responses:
+        "200":
+          content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, added: { type: integer } } } } }
+          description: OK
+        "401": { description: 金鑰錯誤 }
+        "404": { description: 工作不存在 }
+
+  /ocr/status:
+    get:
+      summary: 佇列狀態
+      security: [{ ocrKey: [] }]
+      responses:
+        "200":
+          content: { application/json: { schema: { type: object, properties: { pending: { type: integer } } } } }
+          description: OK
+        "401": { description: 金鑰錯誤 }

@@ -10,7 +10,8 @@
     "deploy": "wrangler deploy",
     "test:e2e": "node test/e2e.mjs",
     "check": "node tools/check-deploy.mjs",
-    "db:local": "wrangler d1 execute hangman --local --file=schema.sql && npm run seed:gen && wrangler d1 execute hangman --local --file=seed-dict.sql"
+    "db:local": "wrangler d1 execute hangman --local --file=schema.sql && npm run seed:gen && wrangler d1 execute hangman --local --file=seed-dict.sql",
+    "test:client": "node test/client.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.0"
