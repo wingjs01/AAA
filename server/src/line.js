@@ -1,7 +1,15 @@
 /** LINE Messaging API 介接 */
 
-const API = 'https://api.line.me/v2/bot';
-const DATA_API = 'https://api-data.line.me/v2/bot';
+/**
+ * LINE 的 API 位址可以用環境變數覆寫，方便在本機用測試替身跑完整流程。
+ * 正式環境不要設這兩個變數，會自動使用 LINE 官方位址。
+ */
+export function apiBase(env) {
+  return (env && env.LINE_API_BASE) || 'https://api.line.me/v2/bot';
+}
+export function dataApiBase(env) {
+  return (env && env.LINE_DATA_API_BASE) || 'https://api-data.line.me/v2/bot';
+}
 
 /**
  * 驗證 LINE 的 X-Line-Signature（HMAC-SHA256 + base64）。
@@ -29,13 +37,13 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
-export async function reply(token, replyToken, messages) {
+export async function reply(env, replyToken, messages) {
   const list = Array.isArray(messages) ? messages : [{ type: 'text', text: String(messages) }];
-  const res = await fetch(`${API}/message/reply`, {
+  const res = await fetch(`${apiBase(env)}/message/reply`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}`
     },
     body: JSON.stringify({ replyToken, messages: list.slice(0, 5) })
   });
@@ -46,11 +54,11 @@ export async function reply(token, replyToken, messages) {
 }
 
 /** 主動推播（reply 權杖失效時才用，會計入 LINE 的訊息額度） */
-export async function push(token, to, messages) {
+export async function push(env, to, messages) {
   const list = Array.isArray(messages) ? messages : [{ type: 'text', text: String(messages) }];
-  const res = await fetch(`${API}/message/push`, {
+  const res = await fetch(`${apiBase(env)}/message/push`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}` },
     body: JSON.stringify({ to, messages: list.slice(0, 5) })
   });
   if (!res.ok) console.error('LINE push failed', res.status, await res.text());
@@ -58,9 +66,9 @@ export async function push(token, to, messages) {
 }
 
 /** 下載使用者傳來的圖片，回傳 base64 與 MIME type */
-export async function getImageContent(token, messageId) {
-  const res = await fetch(`${DATA_API}/message/${messageId}/content`, {
-    headers: { Authorization: `Bearer ${token}` }
+export async function getImageContent(env, messageId) {
+  const res = await fetch(`${dataApiBase(env)}/message/${messageId}/content`, {
+    headers: { Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}` }
   });
   if (!res.ok) throw new Error(`取得圖片失敗：${res.status}`);
 
@@ -89,10 +97,10 @@ function bufferToBase64(buf) {
   return btoa(bin);
 }
 
-export async function getProfile(token, userId) {
+export async function getProfile(env, userId) {
   try {
-    const res = await fetch(`${API}/profile/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await fetch(`${apiBase(env)}/profile/${userId}`, {
+      headers: { Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}` }
     });
     if (!res.ok) return null;
     return await res.json();

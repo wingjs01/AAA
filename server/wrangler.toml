@@ -13,7 +13,8 @@ OCR_MODE = "local"
 [[d1_databases]]
 binding = "DB"
 database_name = "hangman"
-database_id = "請填入 wrangler d1 create hangman 產生的 id"
+# 執行 npx wrangler d1 create hangman 之後，把它印出的 id 貼到這裡
+database_id = "00000000-0000-0000-0000-000000000000"
 
 # 機密資訊不要寫在這個檔案，用指令設定：
 #   wrangler secret put LINE_CHANNEL_SECRET

@@ -83,14 +83,37 @@ npx wrangler secret put LIFF_CHANNEL_ID            # 用 LIFF 才需要
 
 把 `wrangler.toml` 的 `GAME_URL` 改成你的遊戲網頁網址。
 
+### 3.5 先在本機驗一次（不用部署、不會連到真的 LINE）
+
+```bash
+npm run db:local     # 建本機 D1、匯入辭典
+npm run test:e2e     # 用 workerd 真的跑 Worker，LINE 端用測試替身
+```
+
+32 項端對端測試會走完整條鏈路：簽章驗證 → 指令 → 寫入 D1 → 音標補齊 →
+圖片佇列 → 本地 OCR 取件回報 → 網頁 API 權限隔離。全過才往下走。
+
 ### 4. 部署並接上 LINE
 
 ```bash
 npx wrangler deploy
 ```
 
-把印出的網址加上 `/line/webhook`，填進 LINE Developers 的 **Webhook URL**，
-按 Verify 應該顯示成功。然後用手機加這個官方帳號為好友，傳一句 `apple 蘋果` 測試。
+部署完先檢查一遍：
+
+```bash
+WORKER_URL=https://你的.workers.dev \
+LINE_CHANNEL_SECRET=你的secret \
+OCR_WORKER_KEY=你的金鑰 \
+npm run check
+```
+
+都通過之後，把網址加上 `/line/webhook` 填進 LINE Developers 的 **Webhook URL**，
+按 Verify。然後用手機加這個官方帳號為好友，傳一句 `apple 蘋果` 測試。
+
+> **如果這個 LINE 帳號已經在跑別的功能**：一個 channel 只能有一個 Webhook URL，
+> 改指過來會讓原本的功能停止運作。建議另外開一個 Messaging API channel 給單字機器人，
+> 或是讓原本的後端把單字相關的事件轉發到這個 Worker。
 
 ### 5. 讓遊戲網頁讀得到題庫
 
@@ -134,6 +157,8 @@ npm test
 - `test/bot.test.mjs`（24 項）題庫管理、加字去重、音標補齊、多使用者隔離
 - `test/security.test.mjs`（13 項）LINE 簽章驗證、辨識結果清洗
 - `test/queue.test.mjs`（9 項）工作佇列：領取互斥、逾時重排、重試上限
+- `test/e2e.mjs`（32 項）端對端：用 workerd 實際執行 Worker，
+  只有 LINE 那端是替身。`npm run test:e2e`
 
 本地 OCR 端另有 28 項測試，見 [`../ocr/README.md`](../ocr/README.md)。
 

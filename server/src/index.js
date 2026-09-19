@@ -73,7 +73,7 @@ async function handleWebhook(request, env, ctx) {
   ctx.waitUntil(Promise.all(events.map((e) => handleEvent(e, env).catch((err) => {
     console.error('event failed', err && err.stack);
     if (e.replyToken) {
-      return LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, e.replyToken,
+      return LINE.reply(env, e.replyToken,
         '處理時發生問題：' + (err.message || '未知錯誤'));
     }
   }))));
@@ -84,31 +84,31 @@ async function handleWebhook(request, env, ctx) {
 async function handleEvent(event, env) {
   if (event.type === 'follow') {
     const user = await DB.ensureUser(env.DB, event.source.userId, '');
-    return LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken, welcomeText(env, user));
+    return LINE.reply(env, event.replyToken, welcomeText(env, user));
   }
   if (event.type !== 'message') return;
 
   const userId = event.source && event.source.userId;
   if (!userId) return;
 
-  const profile = await LINE.getProfile(env.LINE_CHANNEL_ACCESS_TOKEN, userId);
+  const profile = await LINE.getProfile(env, userId);
   const user = await DB.ensureUser(env.DB, userId, profile ? profile.displayName : '');
 
   if (event.message.type === 'text') {
     const text = await handleTextMessage(event.message.text, user, env);
-    return LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken, text);
+    return LINE.reply(env, event.replyToken, text);
   }
 
   if (event.message.type === 'image') {
     const out = await handleImageMessage(event.message.id, user, env, event.replyToken);
     // 走本地 OCR 時先不佔用 replyToken，留給辨識完成後的回覆
     if (out && out.defer) {
-      return LINE.push(env.LINE_CHANNEL_ACCESS_TOKEN, user.line_user_id, out.text);
+      return LINE.push(env, user.line_user_id, out.text);
     }
-    return LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken, out);
+    return LINE.reply(env, event.replyToken, out);
   }
 
-  return LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken,
+  return LINE.reply(env, event.replyToken,
     '我只看得懂文字和圖片喔。輸入 /說明 看用法。');
 }
 
@@ -258,7 +258,7 @@ export async function handleImageMessage(messageId, user, env, replyToken) {
     return '圖片辨識還沒設定好。\n目前可以用打字的方式上傳：\n\napple 蘋果\nbanana 香蕉';
   }
 
-  const image = await LINE.getImageContent(env.LINE_CHANNEL_ACCESS_TOKEN, messageId);
+  const image = await LINE.getImageContent(env, messageId);
   const result = await extractFromImage(env.ANTHROPIC_API_KEY, image);
 
   if (!result.words.length) {
@@ -382,7 +382,7 @@ async function handleOcrApi(url, request, env) {
     if (!job || !job.line_message_id) return json({ error: 'not found' }, 404);
 
     const res = await fetch(
-      `https://api-data.line.me/v2/bot/message/${job.line_message_id}/content`,
+      `${LINE.dataApiBase(env)}/message/${job.line_message_id}/content`,
       { headers: { Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}` } }
     );
     if (!res.ok) return json({ error: 'image fetch failed' }, 502);
@@ -451,10 +451,10 @@ async function db_userOf(env, lineUserId) {
 /** 辨識完成的通知：先用 replyToken（免費），失效就改用 push */
 async function notify(env, job, text) {
   if (job.reply_token) {
-    const ok = await LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, job.reply_token, text);
+    const ok = await LINE.reply(env, job.reply_token, text);
     if (ok) return;
   }
-  await LINE.push(env.LINE_CHANNEL_ACCESS_TOKEN, job.line_user_id, text);
+  await LINE.push(env, job.line_user_id, text);
 }
 
 /* ========================= 網頁 API ========================= */
