@@ -57,7 +57,11 @@ var Cloud = (function () {
   }
 
   function get(path) {
-    return fetch(API_BASE + path, { method: 'GET' }).then(function (res) {
+    return fetch(API_BASE + path, {
+      method: 'GET',
+      // 後端走 ngrok 免費網域時，沒帶這個標頭會收到 ngrok 的警告頁而不是 JSON
+      headers: { 'ngrok-skip-browser-warning': 'true' }
+    }).then(function (res) {
       if (!res.ok) throw new Error(res.status === 401 ? '連結已失效' : '連線失敗（' + res.status + '）');
       return res.json();
     });
@@ -87,7 +91,7 @@ var Cloud = (function () {
         if (!idToken) return null;
         return fetch(API_BASE + '/api/liff', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
           body: JSON.stringify({ idToken: idToken })
         }).then(function (r) { return r.ok ? r.json() : null; });
       })
