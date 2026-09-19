@@ -15,12 +15,19 @@
     <h1 class="title">單字吊人</h1>
     <p class="subtitle">看中文與音標，把英文單字拼出來。<br>每拼錯一次，繩子上的人就多長一塊。</p>
 
-    <div class="difficulty-list" id="difficultyList"></div>
+    <div class="section-head"><span>內建字庫</span></div>
+    <div class="deck-cards" id="difficultyList"></div>
+
+    <div class="section-head">
+      <span>我的字庫</span>
+      <button id="btnNewDeck" class="btn btn-sm" type="button">＋ 新增字庫</button>
+    </div>
+    <div class="deck-cards" id="myDeckList"></div>
 
     <div class="rules">
       <h3>玩法</h3>
       <ul>
-        <li>每局 <b>5 關</b>，每關一個單字。</li>
+        <li>每局最多 <b>5 關</b>，每關一個單字。</li>
         <li>用鍵盤或畫面上的字母猜字；猜錯 <b>6 次</b> 人就被吊死。</li>
         <li>被吊死 → <b>通關失敗</b>，整局結束。</li>
         <li>「提示」可揭開一個字母，但要付出一次錯誤機會。</li>
@@ -28,12 +35,68 @@
     </div>
   </section>
 
+  <!-- ===== 字庫編輯畫面 ===== -->
+  <section id="screen-deck" class="screen">
+    <header class="hud">
+      <button id="btnDeckBack" class="btn btn-ghost btn-sm" type="button">← 返回</button>
+      <input id="deckName" class="input deck-name-input" type="text" placeholder="字庫名稱（例：第三課單字）" maxlength="40">
+      <button id="btnDeckSave" class="btn btn-primary btn-sm" type="button">儲存字庫</button>
+    </header>
+
+    <div class="editor-panel">
+      <h3 class="panel-title" id="formTitle">新增單字</h3>
+      <p class="panel-note">只要打英文單字，<b>音標和發音我自動幫你填</b>（內建 11 萬字發音辭典，離線可用）。</p>
+
+      <div class="form-grid">
+        <label class="field field-word">
+          <span class="field-label">英文單字 <b class="req">*</b></span>
+          <div class="field-row">
+            <input id="inWord" class="input" type="text" placeholder="butterfly" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <button id="btnTrySpeak" class="btn btn-icon" type="button" title="試聽發音">🔊</button>
+          </div>
+          <span class="field-msg" id="wordMsg"></span>
+        </label>
+
+        <label class="field">
+          <span class="field-label">中文意思</span>
+          <input id="inZh" class="input" type="text" placeholder="蝴蝶" autocomplete="off">
+        </label>
+
+        <label class="field field-wide">
+          <span class="field-label">音標 <span class="field-auto" id="ipaStatus">自動填入</span></span>
+          <input id="inIpa" class="input input-ipa" type="text" placeholder="打完單字會自動出現" autocomplete="off">
+        </label>
+
+        <label class="field field-wide">
+          <span class="field-label">例句（可不填，單字處用 ___ 或直接寫出來）</span>
+          <input id="inHint" class="input" type="text" placeholder="A yellow ___ landed on the flower." autocomplete="off">
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button id="btnAddWord" class="btn btn-primary" type="button">＋ 加入字庫</button>
+        <button id="btnCancelEdit" class="btn btn-ghost" type="button" hidden>取消修改</button>
+      </div>
+    </div>
+
+    <div class="list-head">
+      <span>單字清單（<b id="deckCount">0</b>）</span>
+      <div class="list-tools">
+        <button id="btnExport" class="btn btn-ghost btn-sm" type="button">⬇ 匯出備份</button>
+        <label class="btn btn-ghost btn-sm file-label">⬆ 還原備份
+          <input id="fileRestore" type="file" accept=".json,application/json" hidden>
+        </label>
+      </div>
+    </div>
+    <div id="deckWords" class="deck-words"></div>
+  </section>
+
   <!-- ===== 遊戲畫面 ===== -->
   <section id="screen-game" class="screen">
 
     <header class="hud">
       <div class="hud-item"><span class="hud-label">關卡</span><span id="hudRound" class="hud-value">1 / 5</span></div>
-      <div class="hud-item"><span class="hud-label">難度</span><span id="hudDiff" class="hud-value">簡單</span></div>
+      <div class="hud-item hud-grow"><span class="hud-label">字庫</span><span id="hudDiff" class="hud-value">簡單</span></div>
       <div class="hud-item"><span class="hud-label">分數</span><span id="hudScore" class="hud-value">0</span></div>
       <button id="btnQuit" class="btn btn-ghost btn-sm" type="button">放棄</button>
     </header>
@@ -43,7 +106,6 @@
       <!-- 吊人 -->
       <div class="gallows-panel">
         <svg id="hangman" class="hangman" viewBox="0 0 200 240" role="img" aria-label="吊人進度">
-          <!-- 絞刑架 -->
           <g class="frame" stroke-linecap="round">
             <line x1="20"  y1="230" x2="120" y2="230"/>
             <line x1="55"  y1="230" x2="55"  y2="20"/>
@@ -51,7 +113,6 @@
             <line x1="90"  y1="20"  x2="55"  y2="55"/>
             <line x1="140" y1="20"  x2="140" y2="45"/>
           </g>
-          <!-- 人形：依錯誤次數逐步顯示 -->
           <g class="victim" stroke-linecap="round">
             <circle class="part" data-part="1" cx="140" cy="62" r="17"/>
             <line   class="part" data-part="2" x1="140" y1="79"  x2="140" y2="140"/>
@@ -59,7 +120,6 @@
             <line   class="part" data-part="4" x1="140" y1="95"  x2="168" y2="120"/>
             <line   class="part" data-part="5" x1="140" y1="140" x2="116" y2="185"/>
             <line   class="part" data-part="6" x1="140" y1="140" x2="164" y2="185"/>
-            <!-- 死亡表情 -->
             <g class="face">
               <line x1="131" y1="56" x2="137" y2="62"/>
               <line x1="137" y1="56" x2="131" y2="62"/>
@@ -131,6 +191,8 @@
 </div>
 
 <script src="words.js"></script>
+<script src="ipa.js"></script>
+<script src="decks.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
