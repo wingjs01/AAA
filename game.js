@@ -830,6 +830,16 @@
   renderStart();
   show('start');
   if (Cloud.enabled()) {
-    Cloud.load().then(renderLineDecks).catch(function () { renderLineDecks(); });
+    Cloud.load().then(function () {
+      renderLineDecks();
+      // 從 LINE 的測驗連結進來：直接開始那一份，不用再點一次
+      var deckId = Cloud.takeAutoDeck();
+      if (!deckId) return;
+      var st = Cloud.state();
+      var deck = st.decks.filter(function (d) { return d.id === deckId; })[0];
+      if (deck && deck.word_count > 0) {
+        startGame({ kind: 'cloud', deckId: deck.id, name: deck.name });
+      }
+    }).catch(function () { renderLineDecks(); });
   }
 })();

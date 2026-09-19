@@ -176,6 +176,32 @@ export async function runCommand(cmd, user, env) {
       return done ? `已從目前題庫移除「${chk.word}」。` : `目前題庫裡沒有「${chk.word}」。`;
     }
 
+    case 'quiz': {
+      const decks = await DB.listDecks(db, user.line_user_id);
+      const usable = decks.filter((d) => d.word_count > 0);
+      if (!usable.length) {
+        return '還沒有可以測驗的題庫。\n\n先用「/新增 課本第一課」建題庫，再把單字傳給我。';
+      }
+
+      // 有指定題庫名稱就直接給那一份
+      if (cmd.arg) {
+        const chk = normalizeDeckName(cmd.arg);
+        if (chk.error) return chk.error;
+        const deck = usable.find((d) => d.name === chk.name);
+        if (!deck) {
+          const names = usable.map((d) => '・' + d.name).join('\n');
+          return `找不到有單字的題庫「${chk.name}」。\n\n可以測驗的有：\n${names}`;
+        }
+        return quizText(env, user, deck);
+      }
+
+      // 沒指定就把每個題庫的測驗連結都列出來
+      const lines = usable.map((d) =>
+        `【${d.name}】${d.word_count} 字・${Math.min(5, d.word_count)} 題\n${quizUrl(env, user, d.id)}`
+      ).join('\n\n');
+      return `選一個開始測驗：\n\n${lines}\n\n（也可以直接說「/測驗 課本第一課」）`;
+    }
+
     case 'play':
       return playText(env, user);
 
@@ -249,13 +275,23 @@ function summary(deck, entries, res, bad, env, user, note) {
   if (noIpa) out += `\n\n（${noIpa} 個字辭典查不到音標，遊戲裡仍可用發音）`;
   if (bad && bad.length) out += `\n\n略過 ${bad.length} 筆無法辨識的內容`;
   if (note) out += `\n\n備註：${note}`;
-  out += `\n\n開始玩：${gameUrl(env, user)}`;
+  out += `\n\n開始測驗：${quizUrl(env, user, deck.id)}`;
   return out;
 }
 
 function gameUrl(env, user) {
   const base = env.GAME_URL || 'https://example.com';
   return `${base}?t=${user.web_token}`;
+}
+
+/** 單一題庫的測驗連結，打開就直接開始那一份 */
+function quizUrl(env, user, deckId) {
+  return `${gameUrl(env, user)}&d=${deckId}`;
+}
+
+function quizText(env, user, deck) {
+  const rounds = Math.min(5, deck.word_count);
+  return `【${deck.name}】的測驗\n${deck.word_count} 個單字，這一局考 ${rounds} 題\n\n${quizUrl(env, user, deck.id)}\n\n點連結在網頁上作答。`;
 }
 
 function playText(env, user) {
@@ -282,7 +318,9 @@ banana
 /清單　　　　　看目前題庫的單字
 /移除 apple　　刪掉一個單字
 /刪除 課本第一課　刪掉整個題庫
-/玩　　　　　　取得遊戲連結`;
+/測驗　　　　　取得測驗連結
+/測驗 課本第一課　直接考這一份
+/玩　　　　　　所有題庫的總覽連結`;
 }
 
 /* ========================= 網頁 API ========================= */

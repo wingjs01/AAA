@@ -113,6 +113,42 @@ await t('兩個使用者的題庫互不干擾', async () => {
   assert.equal(other[0].name, '我的單字');
 });
 
+console.log('\n[要求測驗]');
+await t('沒有題庫時提示先建立', async () => {
+  const u3 = await DB.ensureUser(db, 'U_quiz_empty', '空的人');
+  assert.match(await handleTextMessage('/測驗', u3, env), /還沒有可以測驗的題庫/);
+});
+await t('列出所有可測驗的題庫與連結', async () => {
+  const out = await say('/測驗');
+  assert.match(out, /【課本第一課】/);
+  assert.match(out, /&d=\d+/, '連結要帶題庫編號');
+});
+await t('指定題庫直接給該份連結', async () => {
+  const u = await reload();
+  const decks = await DB.listDecks(db, UID);
+  const target = decks.find((d) => d.name === '課本第一課');
+  const out = await say('/測驗 課本第一課');
+  assert.match(out, new RegExp('\\?t=' + u.web_token + '&d=' + target.id));
+  assert.match(out, /這一局考 4 題/);
+});
+await t('指定不存在的題庫會列出可用的', async () => {
+  const out = await say('/測驗 沒這個');
+  assert.match(out, /找不到有單字的題庫/);
+  assert.match(out, /・課本第一課/);
+});
+await t('空題庫不會出現在測驗清單', async () => {
+  await say('/新增 全空的題庫');
+  const out = await say('/測驗');
+  assert.doesNotMatch(out, /全空的題庫/);
+  await say('/切換 課本第一課');
+});
+await t('收完單字直接附上該題庫的測驗連結', async () => {
+  const decks = await DB.listDecks(db, UID);
+  const target = decks.find((d) => d.name === '課本第一課');
+  const out = await say('grape 葡萄');
+  assert.match(out, new RegExp('開始測驗：.*&d=' + target.id));
+});
+
 console.log('\n[遊戲連結]');
 await t('/玩 回傳帶 token 的連結', async () => {
   const u = await reload();

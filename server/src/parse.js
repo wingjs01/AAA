@@ -17,7 +17,8 @@ const COMMANDS = {
   '刪除': 'remove', 'delete': 'remove',
   '清單': 'list',   'list': 'list',
   '移除': 'unword',
-  '玩': 'play',     'play': 'play'
+  '玩': 'play',     'play': 'play',
+  '測驗': 'quiz',   'quiz': 'quiz',   '考試': 'quiz'
 };
 
 /**

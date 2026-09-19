@@ -9,6 +9,11 @@ var Cloud = (function () {
   var TOKEN_KEY = 'hangman.lineToken.v1';
   var state = { ready: false, token: null, name: '', decks: [], error: '' };
 
+  // 進站時先把網址參數收起來，稍後會把它們從網址列清掉
+  var params = new URLSearchParams(window.location.search);
+  var urlToken = params.get('t');
+  var autoDeckId = parseInt(params.get('d'), 10) || null;
+
   function enabled() {
     return typeof API_BASE === 'string' && API_BASE !== '';
   }
@@ -26,16 +31,29 @@ var Cloud = (function () {
     state = { ready: true, token: null, name: '', decks: [], error: '' };
   }
 
-  /** 網址帶 ?t=... 時優先採用，並把它從網址列拿掉避免被看到或被分享出去 */
+  /** 把網址上的 token 收下來，並清掉網址列避免被看到或被分享出去 */
   function tokenFromUrl() {
-    var t = new URLSearchParams(window.location.search).get('t');
-    if (!t) return null;
-    storeToken(t);
+    cleanUrl();
+    if (!urlToken) return null;
+    storeToken(urlToken);
+    return urlToken;
+  }
+
+  var urlCleaned = false;
+  function cleanUrl() {
+    if (urlCleaned) return;
+    urlCleaned = true;
+    if (!urlToken && !autoDeckId) return;
     try {
-      var clean = window.location.pathname + window.location.hash;
-      window.history.replaceState({}, '', clean);
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     } catch (e) {}
-    return t;
+  }
+
+  /** 測驗連結指定的題庫編號，用過就清掉，重整不會又自動開一次 */
+  function takeAutoDeck() {
+    var id = autoDeckId;
+    autoDeckId = null;
+    return id;
   }
 
   function get(path) {
@@ -82,6 +100,7 @@ var Cloud = (function () {
     if (!enabled()) { state.ready = true; return Promise.resolve(state); }
 
     return tryLiff().then(function (liffData) {
+      cleanUrl();
       if (liffData && liffData.token) {
         storeToken(liffData.token);
         state = { ready: true, token: liffData.token, name: liffData.name || '', decks: liffData.decks || [], error: '' };
@@ -116,6 +135,7 @@ var Cloud = (function () {
     load: load,
     loadWords: loadWords,
     forget: forget,
+    takeAutoDeck: takeAutoDeck,
     state: function () { return state; }
   };
 })();
