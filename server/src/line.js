@@ -45,6 +45,18 @@ export async function reply(token, replyToken, messages) {
   return res.ok;
 }
 
+/** 主動推播（reply 權杖失效時才用，會計入 LINE 的訊息額度） */
+export async function push(token, to, messages) {
+  const list = Array.isArray(messages) ? messages : [{ type: 'text', text: String(messages) }];
+  const res = await fetch(`${API}/message/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ to, messages: list.slice(0, 5) })
+  });
+  if (!res.ok) console.error('LINE push failed', res.status, await res.text());
+  return res.ok;
+}
+
 /** 下載使用者傳來的圖片，回傳 base64 與 MIME type */
 export async function getImageContent(token, messageId) {
   const res = await fetch(`${DATA_API}/message/${messageId}/content`, {

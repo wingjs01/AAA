@@ -132,3 +132,54 @@ export async function removeWord(db, deckId, word) {
     .bind(deckId, word).run();
   return res.meta.changes > 0;
 }
+
+/* ===================== 圖片辨識佇列 ===================== */
+
+export async function createJob(db, { lineUserId, deckId, source, messageId, replyToken }) {
+  const res = await db.prepare(
+    `INSERT INTO jobs (line_user_id, deck_id, status, source, line_message_id, reply_token, created_at)
+     VALUES (?, ?, 'pending', ?, ?, ?, ?)`
+  ).bind(lineUserId, deckId, source || 'line', messageId || null, replyToken || null, now()).run();
+  return res.meta.last_row_id;
+}
+
+/**
+ * 領一份工作。用條件式 UPDATE 確保同一份不會被兩台機器同時領走。
+ * 超過 3 分鐘還卡在 working 的視為失敗，允許重領一次。
+ */
+export async function claimJob(db) {
+  const stale = now() - 3 * 60 * 1000;
+  await db.prepare(
+    `UPDATE jobs SET status = 'pending' WHERE status = 'working' AND claimed_at < ? AND attempts < 3`
+  ).bind(stale).run();
+
+  const job = await db.prepare(
+    `SELECT * FROM jobs WHERE status = 'pending' ORDER BY created_at LIMIT 1`
+  ).first();
+  if (!job) return null;
+
+  const upd = await db.prepare(
+    `UPDATE jobs SET status = 'working', claimed_at = ?, attempts = attempts + 1
+      WHERE id = ? AND status = 'pending'`
+  ).bind(now(), job.id).run();
+
+  if (!upd.meta.changes) return null;   // 被別人搶先領走
+  return { ...job, status: 'working' };
+}
+
+export async function getJob(db, id) {
+  return db.prepare('SELECT * FROM jobs WHERE id = ?').bind(id).first();
+}
+
+export async function finishJob(db, id, count, error) {
+  await db.prepare(
+    `UPDATE jobs SET status = ?, result_count = ?, error = ?, done_at = ? WHERE id = ?`
+  ).bind(error ? 'failed' : 'done', count || 0, error || null, now(), id).run();
+}
+
+export async function countPendingJobs(db) {
+  const r = await db.prepare(
+    `SELECT COUNT(*) AS n FROM jobs WHERE status IN ('pending','working')`
+  ).first();
+  return r ? r.n : 0;
+}

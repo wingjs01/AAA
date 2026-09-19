@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test/parse.test.mjs && node test/bot.test.mjs",
+    "test": "node test/parse.test.mjs && node test/bot.test.mjs && node test/security.test.mjs && node test/queue.test.mjs",
     "seed:gen": "node tools/gen-dict-sql.mjs",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"

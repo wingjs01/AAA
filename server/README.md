@@ -76,7 +76,8 @@ npx wrangler d1 execute hangman --remote --file=seed-dict.sql
 ```bash
 npx wrangler secret put LINE_CHANNEL_SECRET        # 步驟 1 的 Channel secret
 npx wrangler secret put LINE_CHANNEL_ACCESS_TOKEN  # 步驟 1 的 access token
-npx wrangler secret put ANTHROPIC_API_KEY          # 圖片辨識用；不填則只支援文字
+npx wrangler secret put OCR_WORKER_KEY             # 本地 OCR 的共用金鑰，自己想一組長字串
+npx wrangler secret put ANTHROPIC_API_KEY          # 只有 OCR_MODE=cloud 才需要
 npx wrangler secret put LIFF_CHANNEL_ID            # 用 LIFF 才需要
 ```
 
@@ -118,7 +119,8 @@ Channel ID 用 `wrangler secret put LIFF_CHANNEL_ID` 設定。
 | Cloudflare Workers + D1 | 免費額度內（每天 10 萬次請求、5GB 資料庫） |
 | LINE 回覆訊息 | 免費、無上限（bot 只用 reply 不用 push） |
 | 文字上傳單字 | **完全免費**，不呼叫任何 AI |
-| 圖片辨識 | 每張約 US$0.02（Claude Opus 5），100 張約 US$2 |
+| 圖片辨識（`OCR_MODE=local`） | **免費**，用你自己的 RTX 5060 跑 PaddleOCR |
+| 圖片辨識（`OCR_MODE=cloud`） | 每張約 US$0.02（Claude Opus 5） |
 
 玩遊戲本身不產生任何費用。
 
@@ -131,12 +133,16 @@ npm test
 - `test/parse.test.mjs`（36 項）指令解析、英中分界、單字驗證
 - `test/bot.test.mjs`（24 項）題庫管理、加字去重、音標補齊、多使用者隔離
 - `test/security.test.mjs`（13 項）LINE 簽章驗證、辨識結果清洗
+- `test/queue.test.mjs`（9 項）工作佇列：領取互斥、逾時重排、重試上限
+
+本地 OCR 端另有 28 項測試，見 [`../ocr/README.md`](../ocr/README.md)。
 
 `test/d1-shim.mjs` 用真的 SQLite 模擬 D1，所以 SQL 本身也在測試範圍內。
 
-> **圖片辨識這段沒有自動測試。** 開發環境連不到 `api.line.me`，
-> 所以 LINE 的收發與圖片辨識的實際準確度必須部署後用手機驗證。
-> 其餘所有邏輯都有測試覆蓋。
+> **LINE 的實際收發沒有自動測試。** 開發環境連不到 `api.line.me`，
+> 這段必須部署後用手機驗證。圖片辨識的配對邏輯有完整測試
+> （見 `../ocr/test_pairing.py`），但 PaddleOCR 在真實照片上的辨識率
+> 要用你的機器跑 `service.py --once` 才知道。
 
 ## 檔案
 
@@ -149,3 +155,5 @@ npm test
 | `src/db.js` | D1 存取、音標批次查詢 |
 | `schema.sql` | 資料表定義 |
 | `tools/gen-dict-sql.mjs` | 由 `ipa/*.js` 產生辭典匯入 SQL |
+
+圖片辨識的本地端在 [`../ocr/`](../ocr/)。

@@ -40,3 +40,23 @@ CREATE TABLE IF NOT EXISTS dict (
 
 CREATE INDEX IF NOT EXISTS idx_decks_user  ON decks(line_user_id);
 CREATE INDEX IF NOT EXISTS idx_words_deck  ON words(deck_id);
+
+-- 圖片辨識工作佇列
+-- 本地端（RTX 5060）主動輪詢領工作，不需要對外開放任何連接埠
+CREATE TABLE IF NOT EXISTS jobs (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  line_user_id    TEXT NOT NULL,
+  deck_id         INTEGER NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending',  -- pending | working | done | failed
+  source          TEXT NOT NULL DEFAULT 'line',     -- line | web
+  line_message_id TEXT,                             -- 向 LINE 取圖用
+  reply_token     TEXT,                             -- LINE 回覆權杖（有時效）
+  result_count    INTEGER NOT NULL DEFAULT 0,
+  error           TEXT,
+  attempts        INTEGER NOT NULL DEFAULT 0,
+  created_at      INTEGER NOT NULL,
+  claimed_at      INTEGER,
+  done_at         INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, created_at);

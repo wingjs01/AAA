@@ -10,7 +10,7 @@
 import { parseCommand, parseWordLines, normalizeWord, normalizeDeckName } from './parse.js';
 import * as LINE from './line.js';
 import * as DB from './db.js';
-import { extractFromImage } from './extract.js';
+import { extractFromImage, cleanResult } from './extract.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -42,6 +42,9 @@ export default {
       }
       if (url.pathname.startsWith('/api/deck/')) {
         return await handleDeckWords(url, env);
+      }
+      if (url.pathname.startsWith('/ocr/')) {
+        return await handleOcrApi(url, request, env);
       }
       if (url.pathname === '/health') {
         return json({ ok: true });
@@ -97,8 +100,12 @@ async function handleEvent(event, env) {
   }
 
   if (event.message.type === 'image') {
-    const text = await handleImageMessage(event.message.id, user, env);
-    return LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken, text);
+    const out = await handleImageMessage(event.message.id, user, env, event.replyToken);
+    // 走本地 OCR 時先不佔用 replyToken，留給辨識完成後的回覆
+    if (out && out.defer) {
+      return LINE.push(env.LINE_CHANNEL_ACCESS_TOKEN, user.line_user_id, out.text);
+    }
+    return LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken, out);
   }
 
   return LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken,
@@ -227,9 +234,28 @@ export async function addWordsFromText(text, user, env) {
 
 /* ========================= 圖片訊息 ========================= */
 
-export async function handleImageMessage(messageId, user, env) {
+export async function handleImageMessage(messageId, user, env, replyToken) {
+  const deck = await ensureCurrentDeck(user, env);
+
+  // 預設走本地 OCR：排進佇列，等你的機器來領
+  if ((env.OCR_MODE || 'local') === 'local') {
+    const pending = await DB.countPendingJobs(env.DB);
+    await DB.createJob(env.DB, {
+      lineUserId: user.line_user_id,
+      deckId: deck.id,
+      source: 'line',
+      messageId,
+      replyToken
+    });
+    return { defer: true, text:
+      `收到圖片，排進「${deck.name}」的辨識佇列了。` +
+      (pending > 0 ? `\n前面還有 ${pending} 張。` : '') +
+      '\n辨識完成會再通知你。' };
+  }
+
+  // OCR_MODE=cloud：直接用 Claude 辨識
   if (!env.ANTHROPIC_API_KEY) {
-    return '圖片辨識還沒設定好（缺少 ANTHROPIC_API_KEY）。\n目前可以用打字的方式上傳：\n\napple 蘋果\nbanana 香蕉';
+    return '圖片辨識還沒設定好。\n目前可以用打字的方式上傳：\n\napple 蘋果\nbanana 香蕉';
   }
 
   const image = await LINE.getImageContent(env.LINE_CHANNEL_ACCESS_TOKEN, messageId);
@@ -241,7 +267,6 @@ export async function handleImageMessage(messageId, user, env) {
       : '這張圖片裡沒有讀到英文單字。試試看拍清楚一點，或直接打字傳給我。';
   }
 
-  const deck = await ensureCurrentDeck(user, env);
   const res = await DB.addWords(env.DB, deck.id, result.words, 'image');
   return summary(deck, result.words, res, result.skipped, env, user, result.note);
 }
@@ -321,6 +346,101 @@ banana
 /測驗　　　　　取得測驗連結
 /測驗 課本第一課　直接考這一份
 /玩　　　　　　所有題庫的總覽連結`;
+}
+
+/* ========================= 本地 OCR 佇列 API ========================= */
+
+/**
+ * 給本地端（RTX 5060）呼叫的介面。
+ * 本地機器只發出連線、不接受連線，所以不必對外開放任何連接埠。
+ * 以共用金鑰驗證，金鑰用 wrangler secret 設定。
+ */
+async function handleOcrApi(url, request, env) {
+  const key = request.headers.get('x-ocr-key') || url.searchParams.get('k');
+  if (!env.OCR_WORKER_KEY || key !== env.OCR_WORKER_KEY) {
+    return json({ error: 'unauthorized' }, 401);
+  }
+
+  // 領一份工作
+  if (url.pathname === '/ocr/claim' && request.method === 'POST') {
+    const job = await DB.claimJob(env.DB);
+    if (!job) return json({ job: null });
+    const deck = await DB.getDeck(env.DB, job.deck_id);
+    return json({
+      job: {
+        id: job.id,
+        deckName: deck ? deck.name : '',
+        imageUrl: `${url.origin}/ocr/image/${job.id}`
+      }
+    });
+  }
+
+  // 取圖：由 Worker 代為向 LINE 下載，本地端不需要 LINE 的權杖
+  if (url.pathname.startsWith('/ocr/image/') && request.method === 'GET') {
+    const id = parseInt(url.pathname.split('/').pop(), 10);
+    const job = await DB.getJob(env.DB, id);
+    if (!job || !job.line_message_id) return json({ error: 'not found' }, 404);
+
+    const res = await fetch(
+      `https://api-data.line.me/v2/bot/message/${job.line_message_id}/content`,
+      { headers: { Authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}` } }
+    );
+    if (!res.ok) return json({ error: 'image fetch failed' }, 502);
+    return new Response(res.body, {
+      headers: { 'Content-Type': res.headers.get('content-type') || 'image/jpeg' }
+    });
+  }
+
+  // 回報辨識結果
+  if (url.pathname === '/ocr/result' && request.method === 'POST') {
+    const body = await request.json();
+    const job = await DB.getJob(env.DB, body.jobId);
+    if (!job) return json({ error: 'unknown job' }, 404);
+
+    if (body.error) {
+      await DB.finishJob(env.DB, job.id, 0, String(body.error).slice(0, 300));
+      await notify(env, job, `圖片辨識失敗：${body.error}\n可以改用打字上傳，或換一張清楚一點的照片。`);
+      return json({ ok: true });
+    }
+
+    const { words, skipped } = cleanResult({ words: body.words || [], note: '' });
+    const deck = await DB.getDeck(env.DB, job.deck_id);
+    if (!deck) {
+      await DB.finishJob(env.DB, job.id, 0, 'deck missing');
+      return json({ ok: true });
+    }
+
+    if (!words.length) {
+      await DB.finishJob(env.DB, job.id, 0, null);
+      await notify(env, job, '這張圖片沒有讀到英文單字。試試看拍清楚一點，或直接打字傳給我。');
+      return json({ ok: true, added: 0 });
+    }
+
+    const user = await db_userOf(env, job.line_user_id);
+    const res = await DB.addWords(env.DB, deck.id, words, 'image');
+    await DB.finishJob(env.DB, job.id, res.added, null);
+    await notify(env, job, summary(deck, words, res, skipped, env, user));
+    return json({ ok: true, added: res.added });
+  }
+
+  if (url.pathname === '/ocr/status') {
+    return json({ pending: await DB.countPendingJobs(env.DB) });
+  }
+
+  return json({ error: 'not found' }, 404);
+}
+
+async function db_userOf(env, lineUserId) {
+  return DB.ensureUser(env.DB, lineUserId, '');
+}
+
+/** 辨識完成的通知：先用 replyToken（免費），失效就改用 push */
+async function notify(env, job, text) {
+  if (job.reply_token) {
+    const ok = await LINE.reply(env.LINE_CHANNEL_ACCESS_TOKEN, job.reply_token, text);
+    if (ok) return;
+  }
+  await LINE.push(env.LINE_CHANNEL_ACCESS_TOKEN, job.line_user_id, text);
 }
 
 /* ========================= 網頁 API ========================= */

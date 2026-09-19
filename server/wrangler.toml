@@ -6,6 +6,9 @@ compatibility_flags = ["nodejs_compat"]
 # 遊戲網頁的網址，bot 會用它組出你的專屬連結
 [vars]
 GAME_URL = "https://your-game-url.example.com"
+# local = 圖片排進佇列，由你自己的機器（RTX 5060）辨識，不花錢
+# cloud = 直接用 Claude 辨識，每張約 US$0.02
+OCR_MODE = "local"
 
 [[d1_databases]]
 binding = "DB"
@@ -15,5 +18,6 @@ database_id = "請填入 wrangler d1 create hangman 產生的 id"
 # 機密資訊不要寫在這個檔案，用指令設定：
 #   wrangler secret put LINE_CHANNEL_SECRET
 #   wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
-#   wrangler secret put ANTHROPIC_API_KEY
+#   wrangler secret put OCR_WORKER_KEY        本地 OCR 服務的共用金鑰（自己想一組長字串）
+#   wrangler secret put ANTHROPIC_API_KEY      只有 OCR_MODE=cloud 才需要
 #   wrangler secret put LIFF_CHANNEL_ID
