@@ -32,6 +32,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pairing import pair_ocr_results
+from dictionary import load_words, verify_all
 
 
 # ----------------------------------------------------------------- OCR 引擎
@@ -109,18 +110,20 @@ class Worker(object):
             f.write(data)
         return dest
 
-    def report(self, job_id, words=None, error=None):
+    def report(self, job_id, words=None, error=None, fixes=None, suspect=None):
         payload = {'jobId': job_id}
         if error:
             payload['error'] = str(error)[:300]
         else:
             payload['words'] = words or []
+            payload['fixes'] = fixes or []
+            payload['suspect'] = suspect or []
         return self._request('/ocr/result', method='POST', payload=payload)
 
 
 # ----------------------------------------------------------------- 主流程
 
-def process_one(worker, backend, tmp_dir='.'):
+def process_one(worker, backend, tmp_dir='.', words=None):
     """領一份工作做完。有做事回傳 True，沒工作回傳 False。"""
     job = worker.claim()
     if not job:
@@ -134,11 +137,22 @@ def process_one(worker, backend, tmp_dir='.'):
     try:
         worker.download(job['imageUrl'], tmp_path)
         items = backend.read(tmp_path)
-        words = pair_ocr_results(items)
-        print(u'[job %s] 讀到 %d 個文字框 → 配出 %d 個單字' % (job_id, len(items), len(words)))
-        for w in words[:10]:
+        entries = pair_ocr_results(items)
+
+        # 用辭典檢查拼字：英文拼錯的話那題就無解了，所以這一步很關鍵
+        fixes, suspect = [], []
+        if words is not None:
+            entries, fixes, suspect = verify_all(entries, words)
+
+        print(u'[job %s] 讀到 %d 個文字框 → 配出 %d 個單字' % (job_id, len(items), len(entries)))
+        for f in fixes:
+            print(u'    拼字修正 %s → %s' % (f['from'], f['to']))
+        if suspect:
+            print(u'    可疑（辭典查無）：%s' % u'、'.join(suspect))
+        for w in entries[:10]:
             print(u'    %-22s %s' % (w['word'], w['zh']))
-        worker.report(job_id, words=words)
+
+        worker.report(job_id, words=entries, fixes=fixes, suspect=suspect)
     except Exception as exc:
         print(u'[job %s] 失敗：%s' % (job_id, exc))
         try:
@@ -151,11 +165,11 @@ def process_one(worker, backend, tmp_dir='.'):
     return True
 
 
-def loop(worker, backend, idle_interval=3.0, busy_interval=0.2):
+def loop(worker, backend, idle_interval=3.0, busy_interval=0.2, words=None):
     print(u'開始輪詢 %s' % worker.base)
     while True:
         try:
-            did = process_one(worker, backend)
+            did = process_one(worker, backend, words=words)
         except urllib.error.HTTPError as e:
             print(u'Worker 回應 %s —— 檢查 OCR_KEY 是否正確' % e.code)
             did = False
@@ -175,13 +189,22 @@ def main():
     ap.add_argument('--interval', type=float, default=3.0, help='沒工作時的輪詢間隔（秒）')
     args = ap.parse_args()
 
+    dictionary = load_words()
+
     if args.once:
         backend = PaddleBackend(use_gpu=not args.cpu, lang=args.lang)
         items = backend.read(args.once)
-        words = pair_ocr_results(items)
-        print(u'\n讀到 %d 個文字框，配出 %d 個單字：\n' % (len(items), len(words)))
-        for w in words:
+        entries = pair_ocr_results(items)
+        entries, fixes, suspect = verify_all(entries, dictionary)
+        print(u'\n讀到 %d 個文字框，配出 %d 個單字：\n' % (len(items), len(entries)))
+        for w in entries:
             print(u'  %-24s %s' % (w['word'], w['zh']))
+        if fixes:
+            print(u'\n拼字修正 %d 處：' % len(fixes))
+            for f in fixes:
+                print(u'  %s → %s' % (f['from'], f['to']))
+        if suspect:
+            print(u'\n辭典查無、請檢查：%s' % u'、'.join(suspect))
         return
 
     base = os.environ.get('WORKER_URL')
@@ -190,8 +213,9 @@ def main():
         print(u'請先設定環境變數 WORKER_URL 與 OCR_KEY')
         sys.exit(1)
 
+    print(u'辭典載入 %d 字' % len(dictionary))
     backend = PaddleBackend(use_gpu=not args.cpu, lang=args.lang)
-    loop(Worker(base, key), backend, idle_interval=args.interval)
+    loop(Worker(base, key), backend, idle_interval=args.interval, words=dictionary)
 
 
 if __name__ == '__main__':

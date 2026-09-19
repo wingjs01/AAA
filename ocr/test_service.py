@@ -82,7 +82,9 @@ check(u'有處理回傳 True', process_one(w, backend, '/tmp'), True)
 check(u'有下載圖片', STATE['image_hits'], 1)
 check(u'有呼叫 OCR', len(backend.calls), 1)
 check(u'回報內容正確', STATE['reports'][-1],
-      {'jobId': 1, 'words': [{'word': 'apple', 'zh': u'蘋果'}, {'word': 'banana', 'zh': u'香蕉'}]})
+      {'jobId': 1,
+       'words': [{'word': 'apple', 'zh': u'蘋果'}, {'word': 'banana', 'zh': u'香蕉'}],
+       'fixes': [], 'suspect': []})
 check(u'暫存檔已刪除', os.path.exists('/tmp/ocr_job_1.img'), False)
 
 print(u'\n[OCR 當掉時]')
@@ -97,7 +99,30 @@ check(u'失敗後暫存檔也清掉', os.path.exists('/tmp/ocr_job_2.img'), Fals
 print(u'\n[讀不到任何字]')
 STATE['queue'].append({'id': 3, 'deckName': u'x', 'imageUrl': BASE + '/ocr/image/3'})
 process_one(w, StubBackend([]), '/tmp')
-check(u'回報空清單而非錯誤', STATE['reports'][-1], {'jobId': 3, 'words': []})
+check(u'回報空清單而非錯誤', STATE['reports'][-1],
+      {'jobId': 3, 'words': [], 'fixes': [], 'suspect': []})
+
+print(u'\n[辨識錯字會被辭典修正]')
+from dictionary import load_words
+DICT = load_words()
+STATE['queue'].append({'id': 4, 'deckName': u'x', 'imageUrl': BASE + '/ocr/image/4'})
+process_one(w, StubBackend([
+    {'text': u'rnountain', 'box': [80, 100, 200, 124]},
+    {'text': u'山',        'box': [320, 100, 384, 122]},
+    {'text': u'app1e',     'box': [80, 150, 170, 174]},
+    {'text': u'zzzqqq',    'box': [80, 200, 180, 224]},
+]), '/tmp', words=DICT)
+rep = STATE['reports'][-1]
+check(u'錯字被修正', [x['word'] for x in rep['words']], ['mountain', 'apple', 'zzzqqq'])
+check(u'中文照樣保留', rep['words'][0]['zh'], u'山')
+check(u'修正紀錄有回報', rep['fixes'],
+      [{'from': 'rnountain', 'to': 'mountain'}, {'from': 'app1e', 'to': 'apple'}])
+check(u'可疑字有回報', rep['suspect'], ['zzzqqq'])
+
+print(u'\n[沒帶辭典時不做修正]')
+STATE['queue'].append({'id': 5, 'deckName': u'x', 'imageUrl': BASE + '/ocr/image/5'})
+process_one(w, StubBackend([{'text': u'rnountain', 'box': [80, 100, 200, 124]}]), '/tmp')
+check(u'原樣送出', [x['word'] for x in STATE['reports'][-1]['words']], ['rnountain'])
 
 print(u'\n[金鑰錯誤]')
 bad = Worker(BASE, 'wrong_key')

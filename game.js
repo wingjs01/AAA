@@ -469,8 +469,11 @@
     $('hudRound').textContent = (state.round + 1) + ' / ' + state.queue.length;
     $('hudScore').textContent = state.score;
 
-    $('clueZh').textContent = item.zh || '（未填中文）';
-    $('clueZh').classList.toggle('no-zh', !item.zh);
+    // 沒有中文時改成「聽發音拼單字」——音檔就是唯一的線索，所以自動念一次
+    var audioMode = !item.zh;
+    $('clueZh').textContent = item.zh || '聽發音，拼出單字';
+    $('clueZh').classList.toggle('audio-mode', audioMode);
+    $('screen-game').classList.toggle('is-audio', audioMode);
 
     $('clueIpa').textContent = item.ipa || '';
     $('clueIpa').hidden = !item.ipa;
@@ -491,6 +494,11 @@
     renderWrong();
     renderHangman();
     renderLives();
+
+    if (audioMode) {
+      // 玩家點「開始」已經是使用者互動，之後的自動朗讀瀏覽器才會放行
+      setTimeout(function () { speak(item.word); }, 350);
+    }
   }
 
   function buildKeyboard() {

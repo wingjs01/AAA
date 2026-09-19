@@ -419,7 +419,21 @@ async function handleOcrApi(url, request, env) {
     const user = await db_userOf(env, job.line_user_id);
     const res = await DB.addWords(env.DB, deck.id, words, 'image');
     await DB.finishJob(env.DB, job.id, res.added, null);
-    await notify(env, job, summary(deck, words, res, skipped, env, user));
+
+    let extra = '';
+    const fixes = Array.isArray(body.fixes) ? body.fixes : [];
+    const suspect = Array.isArray(body.suspect) ? body.suspect : [];
+    if (fixes.length) {
+      extra += '\n\n辭典修正了 ' + fixes.length + ' 處辨識錯誤：\n' +
+        fixes.slice(0, 5).map((f) => `・${f.from} → ${f.to}`).join('\n');
+    }
+    if (suspect.length) {
+      extra += '\n\n這些辭典查不到，可能是辨識錯誤，請檢查：\n' +
+        suspect.slice(0, 5).map((w) => '・' + w).join('\n') +
+        '\n（用 /移除 單字 可以刪掉）';
+    }
+
+    await notify(env, job, summary(deck, words, res, skipped, env, user) + extra);
     return json({ ok: true, added: res.added });
   }
 

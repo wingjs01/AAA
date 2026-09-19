@@ -436,7 +436,22 @@ body {
   font-size: 24px; font-weight: 700;
   font-family: ui-monospace, Menlo, monospace;
 }
-.clue-zh.no-zh { color: var(--muted); font-size: 20px; font-weight: 400; }
+/* 沒有中文時：以發音為主的出題模式 */
+.clue-zh.audio-mode { font-size: 20px; font-weight: 600; color: var(--muted); letter-spacing: .04em; }
+.is-audio .clue-row { margin-top: 12px; }
+.is-audio #btnSpeak {
+  font-size: 28px;
+  padding: 14px 22px;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+.is-audio #btnSpeak:hover { background: rgba(245, 181, 68, .26); }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 181, 68, .35); }
+  50%      { box-shadow: 0 0 0 10px rgba(245, 181, 68, 0); }
+}
+.is-audio .clue-ipa { font-size: 20px; }
 
 /* ---------- 手機 ---------- */
 @media (max-width: 720px) {
