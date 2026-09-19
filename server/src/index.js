@@ -34,6 +34,9 @@ export default {
       if (url.pathname === '/line/webhook' && request.method === 'POST') {
         return await handleWebhook(request, env, ctx);
       }
+      if (url.pathname === '/line/forward' && request.method === 'POST') {
+        return await handleForward(request, env, ctx);
+      }
       if (url.pathname === '/api/liff' && request.method === 'POST') {
         return await handleLiff(request, env);
       }
@@ -79,6 +82,47 @@ async function handleWebhook(request, env, ctx) {
   }))));
 
   return new Response('OK');
+}
+
+/**
+ * 給既有 LINE Bot 轉發事件用。
+ *
+ * 一個 channel 只能有一個 Webhook URL，所以如果這個 LINE 帳號已經在跑
+ * 別的功能，就由原本的後端收下事件、再把單字相關的轉發到這裡。
+ *
+ * 這條路不驗 LINE 簽章（原始 body 位元組在轉發過程中很難保持不變），
+ * 改用共用金鑰驗證呼叫端身分，效果等同而且穩定得多。
+ *
+ * 重要：replyToken 只能用一次。轉發過來的事件請不要在你那邊也回覆，
+ * 否則這邊的回覆會失敗（會自動退回用 push，但那會消耗訊息額度）。
+ */
+async function handleForward(request, env, ctx) {
+  const key = request.headers.get('x-forward-key');
+  if (!env.FORWARD_KEY || key !== env.FORWARD_KEY) {
+    return json({ error: 'unauthorized' }, 401);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return json({ error: 'invalid json' }, 400);
+  }
+
+  // 接受 {events:[...]}、單一事件物件、或事件陣列
+  const events = Array.isArray(body) ? body
+    : Array.isArray(body.events) ? body.events
+    : body.type ? [body]
+    : [];
+
+  if (!events.length) return json({ error: 'no events' }, 400);
+
+  const accepted = events.filter((e) => e && e.type);
+  ctx.waitUntil(Promise.all(accepted.map((e) => handleEvent(e, env).catch((err) => {
+    console.error('forwarded event failed', err && err.stack);
+  }))));
+
+  return json({ ok: true, accepted: accepted.length });
 }
 
 async function handleEvent(event, env) {

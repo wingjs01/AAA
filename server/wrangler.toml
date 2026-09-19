@@ -21,4 +21,5 @@ database_id = "00000000-0000-0000-0000-000000000000"
 #   wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
 #   wrangler secret put OCR_WORKER_KEY        本地 OCR 服務的共用金鑰（自己想一組長字串）
 #   wrangler secret put ANTHROPIC_API_KEY      只有 OCR_MODE=cloud 才需要
+#   wrangler secret put FORWARD_KEY            只有「由既有 bot 轉發事件」才需要
 #   wrangler secret put LIFF_CHANNEL_ID

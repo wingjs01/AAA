@@ -191,6 +191,48 @@ t('提醒可疑的字', ocrMsg.includes('zzzqqq'), ocrMsg);
 const status2 = await (await fetch(`${BASE}/ocr/status`, { headers: { 'x-ocr-key': OCR_KEY } })).json();
 t('處理完後佇列減少', status2.pending < status.pending, { before: status.pending, after: status2.pending });
 
+console.log('\n[既有 bot 轉發事件]');
+const FWD_UID = 'U_fwd_' + Date.now();
+const fwdEvent = (text) => ({
+  type: 'message', replyToken: 'RT_fwd' + Date.now(),
+  source: { type: 'user', userId: FWD_UID },
+  message: { type: 'text', id: 'MF' + Date.now(), text }
+});
+
+const noKey = await fetch(`${BASE}/line/forward`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ events: [fwdEvent('/說明')] })
+});
+t('沒有金鑰被擋（401）', noKey.status === 401);
+
+sent.reply.length = 0;
+const fwdRes = await fetch(`${BASE}/line/forward`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'x-forward-key': 'local_forward_key' },
+  body: JSON.stringify({ events: [fwdEvent('grape 葡萄')] })
+});
+const fwdBody = await fwdRes.json();
+await new Promise((r) => setTimeout(r, 500));
+t('轉發被接受', fwdRes.ok && fwdBody.accepted === 1, fwdBody);
+t('轉發的訊息有被處理', lastReply().includes('新增 1 個'), lastReply());
+t('音標照樣補上', lastReply().includes('/ɡreɪp/'), lastReply());
+
+sent.reply.length = 0;
+const single = await fetch(`${BASE}/line/forward`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'x-forward-key': 'local_forward_key' },
+  body: JSON.stringify(fwdEvent('/題庫'))
+});
+await new Promise((r) => setTimeout(r, 400));
+t('也接受單一事件物件', single.ok && lastReply().includes('你的題庫'), lastReply());
+
+const empty = await fetch(`${BASE}/line/forward`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'x-forward-key': 'local_forward_key' },
+  body: JSON.stringify({ events: [] })
+});
+t('空事件被拒（400）', empty.status === 400);
+
 console.log('\n[網頁 API]');
 const token = quizLink[0].match(/t=([a-f0-9]+)/)[1];
 const decksRes = await fetch(`${BASE}/api/decks?t=${token}`);
