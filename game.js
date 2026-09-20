@@ -5,7 +5,17 @@
   'use strict';
 
   var MAX_WRONG = 6;           // 人形共 6 個部位，滿 6 次就被吊死
-  var MAX_ROUNDS = 5;
+  var MAX_ROUNDS = 5;                 // 預設值；實際用 currentRounds()，見下
+  var ROUNDS_KEY = 'hangman.rounds';  // 使用者選的關卡數（localStorage）
+  var ROUNDS_MIN = 5, ROUNDS_MAX = 100;
+
+  /** 目前設定的每局關卡數（5–100）。滾輪還沒建立時回預設。 */
+  function currentRounds() {
+    var el = document.getElementById('roundsRange');
+    var v = el ? parseInt(el.value, 10) : parseInt(localStorage.getItem(ROUNDS_KEY), 10);
+    if (!v || isNaN(v)) v = MAX_ROUNDS;
+    return Math.max(ROUNDS_MIN, Math.min(ROUNDS_MAX, v));
+  }
   var LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
 
   var $ = function (id) { return document.getElementById(id); };
@@ -90,6 +100,47 @@
     renderLineDecks();
   }
 
+  /* ---------- 公開題庫（任何人都能玩，卡片標示上傳者）---------- */
+  function renderPublicDecks() {
+    var head = $('publicHead');
+    var box = $('publicDeckList');
+    if (!Cloud.enabled()) { head.hidden = true; box.hidden = true; return; }
+
+    var st = Cloud.publicState();
+    if (st.ready && !st.error && !st.decks.length) {   // 沒有人公開 → 整區不出現
+      head.hidden = true; box.hidden = true; return;
+    }
+    head.hidden = false;
+    box.hidden = false;
+    box.innerHTML = '';
+
+    if (!st.ready) { box.innerHTML = '<div class="empty-note">正在讀取公開題庫…</div>'; return; }
+    if (st.error) { box.innerHTML = '<div class="empty-note">讀不到公開題庫：' + esc(st.error) + '</div>'; return; }
+
+    st.decks.forEach(function (deck) {
+      var rounds = Math.min(currentRounds(), deck.word_count);
+      var row = document.createElement('div');
+      row.className = 'deck-card deck-card-custom';
+      row.innerHTML =
+        '<span class="dot dot-line"></span>' +
+        '<span class="d-text">' +
+          '<span class="d-name">' + esc(deck.name) + '</span>' +
+          '<span class="d-desc">' + deck.word_count + ' 個單字・' +
+            (rounds ? '一局 ' + rounds + ' 關' : '還沒有單字') +
+            '・由 ' + esc(deck.owner || '匿名') + ' 分享</span>' +
+        '</span>' +
+        '<span class="card-actions">' +
+          '<button class="btn btn-sm" data-act="playpub" ' + (rounds ? '' : 'disabled') + '>▶ 開始</button>' +
+        '</span>';
+      row.addEventListener('click', function (e) {
+        if (e.target.getAttribute && e.target.getAttribute('data-act') === 'playpub') {
+          startGame({ kind: 'public', pubId: deck.id, name: deck.name + '（' + (deck.owner || '匿名') + '）' });
+        }
+      });
+      box.appendChild(row);
+    });
+  }
+
   /* ---------- LINE 題庫 ---------- */
   function renderLineDecks() {
     var head = $('lineHead');
@@ -122,7 +173,7 @@
     }
 
     st.decks.forEach(function (deck) {
-      var rounds = Math.min(MAX_ROUNDS, deck.word_count);
+      var rounds = Math.min(currentRounds(), deck.word_count);
       var row = document.createElement('div');
       row.className = 'deck-card deck-card-custom';
       row.innerHTML =
@@ -157,7 +208,8 @@
         '<span class="dot"></span>' +
         '<span class="d-text">' +
           '<span class="d-name">' + meta.label + '</span>' +
-          '<span class="d-desc">' + meta.desc + '・共 ' + meta.rounds + ' 關</span>' +
+          '<span class="d-desc">' + meta.desc + '・共 ' +
+            Math.min(currentRounds(), (WORD_BANK[level] || []).length) + ' 關</span>' +
         '</span>';
       btn.addEventListener('click', function () {
         startGame({ kind: 'builtin', level: level });
@@ -411,7 +463,7 @@
       Cloud.loadWords(source.deckId).then(function (words) {
         renderLineDecks();
         if (!words.length) { window.alert('這個題庫還沒有單字。'); return; }
-        beginGame(shuffle(words).slice(0, Math.min(MAX_ROUNDS, words.length)), source.name, source);
+        beginGame(shuffle(words).slice(0, Math.min(currentRounds(), words.length)), source.name, source);
       }).catch(function (err) {
         renderLineDecks();
         window.alert('載入題庫失敗：' + err.message);
@@ -419,9 +471,25 @@
       return;
     }
 
+    if (source.kind === 'public') {
+      var pbtns = document.querySelectorAll('#publicDeckList [data-act="playpub"]');
+      Array.prototype.forEach.call(pbtns, function (b) { b.disabled = true; b.textContent = '載入中…'; });
+      Cloud.loadPublicWords(source.pubId).then(function (words) {
+        renderPublicDecks();
+        if (!words.length) { window.alert('這個公開題庫還沒有單字。'); return; }
+        beginGame(shuffle(words).slice(0, Math.min(currentRounds(), words.length)), source.name, source);
+      }).catch(function (err) {
+        renderPublicDecks();
+        window.alert('載入公開題庫失敗：' + err.message);
+      });
+      return;
+    }
+
     if (source.kind === 'builtin') {
       var meta = DIFFICULTY_META[source.level];
-      queue = shuffle(WORD_BANK[source.level]).slice(0, meta.rounds);
+      // 內建字庫也吃滾輪設定（受該難度的字數上限）
+      queue = shuffle(WORD_BANK[source.level])
+                .slice(0, Math.min(currentRounds(), WORD_BANK[source.level].length));
       label = meta.label;
     } else {
       var deck = Decks.get(source.id);
@@ -429,7 +497,7 @@
         window.alert('這個字庫還沒有單字，先加幾個再開始吧。');
         return;
       }
-      queue = shuffle(deck.words).slice(0, Math.min(MAX_ROUNDS, deck.words.length));
+      queue = shuffle(deck.words).slice(0, Math.min(currentRounds(), deck.words.length));
       label = deck.name;
     }
 
@@ -834,10 +902,32 @@
     renderLineDecks();
   });
 
+  /* ---------- 每局關卡數滾輪 ---------- */
+  (function initRounds() {
+    var el = $('roundsRange'), out = $('roundsValue');
+    if (!el || !out) return;
+    var saved = parseInt(localStorage.getItem(ROUNDS_KEY), 10);
+    if (saved && !isNaN(saved)) el.value = Math.max(ROUNDS_MIN, Math.min(ROUNDS_MAX, saved));
+    out.textContent = el.value;
+    el.addEventListener('input', function () {
+      out.textContent = el.value;
+      try { localStorage.setItem(ROUNDS_KEY, el.value); } catch (e) {}
+      renderStart();          // 卡片上的「一局 N 關」要跟著變
+      renderLineDecks();
+      renderPublicDecks();
+    });
+  })();
+
+  $('btnPublicRefresh').addEventListener('click', function () {
+    Cloud.loadPublic().then(renderPublicDecks);
+    renderPublicDecks();
+  });
+
   /* ---------- 啟動 ---------- */
   renderStart();
   show('start');
   if (Cloud.enabled()) {
+    Cloud.loadPublic().then(renderPublicDecks);     // 公開題庫不需 token，先載
     Cloud.load().then(function () {
       renderLineDecks();
       // 從 LINE 的測驗連結進來：直接開始那一份，不用再點一次
