@@ -8,6 +8,7 @@ var Cloud = (function () {
 
   var TOKEN_KEY = 'hangman.lineToken.v1';
   var state = { ready: false, token: null, name: '', decks: [], error: '' };
+  var pub = { ready: false, decks: [], error: '' };   // 公開題庫（免 token，人人可見）
 
   // 進站時先把網址參數收起來，稍後會把它們從網址列清掉
   var params = new URLSearchParams(window.location.search);
@@ -125,6 +126,27 @@ var Cloud = (function () {
   }
 
   /** 取得某個題庫的單字，格式與本機字庫相同，遊戲端可以直接使用 */
+  /** 公開題庫清單：不需要 token，任何人都看得到。 */
+  function loadPublic() {
+    if (!enabled()) { pub.ready = true; return Promise.resolve(pub); }
+    return get('/api/public').then(function (data) {
+      pub = { ready: true, decks: data.decks || [], error: '' };
+      return pub;
+    }).catch(function (err) {
+      pub = { ready: true, decks: [], error: err.message };
+      return pub;
+    });
+  }
+
+  /** 公開題庫的單字。 */
+  function loadPublicWords(pubId) {
+    return get('/api/public/' + encodeURIComponent(pubId)).then(function (data) {
+      return (data.words || []).map(function (w) {
+        return { word: w.word, zh: w.zh || '', ipa: w.ipa || '', hint: w.hint || '' };
+      });
+    });
+  }
+
   function loadWords(deckId) {
     return get('/api/deck/' + deckId + '?t=' + encodeURIComponent(state.token))
       .then(function (data) {
@@ -140,6 +162,9 @@ var Cloud = (function () {
     loadWords: loadWords,
     forget: forget,
     takeAutoDeck: takeAutoDeck,
+    loadPublic: loadPublic,
+    loadPublicWords: loadPublicWords,
+    publicState: function () { return pub; },
     state: function () { return state; }
   };
 })();
