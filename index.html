@@ -15,6 +15,14 @@
     <h1 class="title">單字吊人</h1>
     <p class="subtitle">看中文與音標，把英文單字拼出來。<br>每拼錯一次，繩子上的人就多長一塊。</p>
 
+    <div class="section-head"><span>每局關卡數</span></div>
+    <div class="rounds-row">
+      <input id="roundsRange" type="range" min="5" max="100" step="1" value="5"
+             aria-label="每局關卡數">
+      <span id="roundsValue" class="rounds-value">5</span>
+      <span class="rounds-hint">題（題庫單字不夠時，以實際字數為準）</span>
+    </div>
+
     <div class="section-head"><span>內建字庫</span></div>
     <div class="deck-cards" id="difficultyList"></div>
 
@@ -23,6 +31,12 @@
       <button id="btnLineRefresh" class="btn btn-sm" type="button">重新整理</button>
     </div>
     <div class="deck-cards" id="lineDeckList" hidden></div>
+
+    <div class="section-head" id="publicHead" hidden>
+      <span>公開題庫</span>
+      <button id="btnPublicRefresh" class="btn btn-sm" type="button">重新整理</button>
+    </div>
+    <div class="deck-cards" id="publicDeckList" hidden></div>
 
     <div class="section-head">
       <span>我的字庫</span>
