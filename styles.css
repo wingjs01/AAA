@@ -228,7 +228,6 @@ body {
   border-bottom: 3px solid var(--muted);
   border-radius: 8px;
   font-size: 26px; font-weight: 700;
-  text-transform: uppercase;
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 .slot.filled { border-bottom-color: var(--good); color: var(--good); animation: pop .3s ease; }
@@ -241,7 +240,6 @@ body {
 .wrong-letters span {
   color: var(--bad);
   font-weight: 700;
-  text-transform: uppercase;
   text-decoration: line-through;
   font-family: ui-monospace, Menlo, monospace;
 }
@@ -249,6 +247,11 @@ body {
 .message { min-height: 26px; margin: 10px 0; text-align: center; font-size: 15px; font-weight: 600; }
 .message.good { color: var(--good); }
 .message.bad  { color: var(--bad); }
+
+/* 每題結束後的「下一題」：玩家看完答案自己點，不再自動跳 */
+.next-row { display: flex; justify-content: center; margin: 4px 0 12px; }
+.next-row[hidden] { display: none; }
+.btn-next { min-width: 180px; padding: 12px 24px; font-size: 17px; }
 
 /* ---------- 鍵盤 ---------- */
 .keyboard {
@@ -264,7 +267,6 @@ body {
   border-radius: 9px;
   color: var(--text);
   font: 700 17px/1 ui-monospace, Menlo, monospace;
-  text-transform: uppercase;
   cursor: pointer;
   transition: transform .12s, background .15s, opacity .2s;
 }
