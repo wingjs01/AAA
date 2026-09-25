@@ -23,6 +23,18 @@
       <span class="rounds-hint">題（題庫單字不夠時，以實際字數為準）</span>
     </div>
 
+    <div class="section-head"><span>遊戲模式</span></div>
+    <div id="modeRow" class="mode-row" role="radiogroup" aria-label="遊戲模式">
+      <button type="button" class="mode-btn" data-mode="hangman" role="radio">
+        <span class="mode-name">🪢 吊人模式</span>
+        <span class="mode-desc">猜字母，猜中的字母會全部現形</span>
+      </button>
+      <button type="button" class="mode-btn" data-mode="spell" role="radio">
+        <span class="mode-name">✍️ Spelling 考驗</span>
+        <span class="mode-desc">每個字母自己打（重複的也要），拼完按送出</span>
+      </button>
+    </div>
+
     <div class="section-head"><span>內建字庫</span></div>
     <div class="deck-cards" id="difficultyList"></div>
 
@@ -170,7 +182,7 @@
         <div id="wordSlots" class="word-slots" aria-live="polite"></div>
 
         <div class="wrong-row">
-          <span class="wrong-label">拼錯過</span>
+          <span id="wrongLabel" class="wrong-label">拼錯過</span>
           <div id="wrongLetters" class="wrong-letters"></div>
         </div>
 
