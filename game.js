@@ -393,7 +393,7 @@
       var row = document.createElement('div');
       row.className = 'word-row';
       row.innerHTML =
-        '<span class="wr-word">' + esc(w.word.toUpperCase()) + '</span>' +
+        '<span class="wr-word">' + esc(w.word) + '</span>' +
         '<span class="wr-ipa">' + esc(w.ipa || '') + '</span>' +
         '<span class="wr-zh">' + esc(w.zh || '（未填中文）') + '</span>' +
         '<span class="wr-acts">' +
@@ -530,6 +530,7 @@
     state.wrong = 0;
     state.hintUsed = 0;
     state.locked = false;
+    hideNext();
 
     var letters = Decks.letterCount(item.word);
     var pieces = item.word.split(/[\s\-]+/).filter(Boolean).length;
@@ -703,20 +704,44 @@
     setMessage((flawless ? '完美！零失誤 ' : '過關！ ') + '+' + gained + ' 分', 'good');
     disableAllKeys();
 
-    setTimeout(function () {
+    // 不自動跳題：等玩家點「下一題」（或按 Enter／空白鍵）
+    var last = state.round + 1 >= state.queue.length;
+    showNext(last ? '看結果 🏆' : '下一題 ▶', function () {
       state.round++;
       if (state.round >= state.queue.length) gameOver(true);
       else loadRound();
-    }, 1400);
+    });
   }
 
   function roundLose() {
     state.locked = true;
     renderSlots(true);
     disableAllKeys();
-    setMessage('他被吊死了…答案是「' + state.word.toUpperCase() + '」', 'bad');
+    setMessage('他被吊死了…答案是「' + state.word + '」', 'bad');
     pushResult(false);
-    setTimeout(function () { gameOver(false); }, 2200);
+    showNext('看結果', function () { gameOver(false); });
+  }
+
+  /* ---------- 「下一題」按鈕 ---------- */
+  var nextAction = null;
+
+  function showNext(label, fn) {
+    nextAction = fn;
+    $('btnNext').textContent = label;
+    $('nextRow').hidden = false;
+    $('btnNext').focus();
+  }
+
+  function hideNext() {
+    nextAction = null;
+    $('nextRow').hidden = true;
+  }
+
+  function goNext() {
+    var fn = nextAction;
+    if (!fn) return;
+    hideNext();
+    fn();
   }
 
   function pushResult(ok) {
@@ -755,7 +780,7 @@
       var row = document.createElement('div');
       row.className = 'review-row ' + (r.ok ? 'ok' : 'fail');
       row.innerHTML =
-        '<span class="rw-word">' + esc(r.word.toUpperCase()) + '</span>' +
+        '<span class="rw-word">' + esc(r.word) + '</span>' +
         '<span class="rw-zh">' + esc(r.zh || '') + '</span>' +
         '<span class="rw-mark">' + (r.ok ? '過關・錯 ' + r.wrong + ' 次' : '失敗') + '</span>';
       list.appendChild(row);
@@ -781,7 +806,7 @@
     renderSlots();
 
     if (isSolved()) { roundWin(); return; }
-    penalty('提示揭開了「' + ch.toUpperCase() + '」，代價是一次機會');
+    penalty('提示揭開了「' + ch + '」，代價是一次機會');
   }
 
   /** 例句裡若沒有 ___，自動把單字本身遮起來 */
@@ -875,6 +900,8 @@
   $('btnSpeak').addEventListener('click', function () { if (state) speak(state.word); });
   $('btnHint').addEventListener('click', useHint);
   $('btnSentence').addEventListener('click', showSentence);
+  $('btnNext').addEventListener('click', goNext);
+
   $('btnQuit').addEventListener('click', function () {
     if (!state) return;
     if (window.confirm('放棄這一局？目前分數不會保留。')) { renderStart(); show('start'); }
@@ -890,6 +917,11 @@
   document.addEventListener('keydown', function (e) {
     if (!screens.game.classList.contains('is-active')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (nextAction && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();       // 按鈕已 focus，擋掉避免 Enter 觸發兩次
+      goNext();
+      return;
+    }
     var ch = e.key.toLowerCase();
     if (ch.length === 1 && ch >= 'a' && ch <= 'z') {
       e.preventDefault();
