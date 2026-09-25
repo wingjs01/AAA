@@ -16,6 +16,15 @@
     if (!v || isNaN(v)) v = MAX_ROUNDS;
     return Math.max(ROUNDS_MIN, Math.min(ROUNDS_MAX, v));
   }
+  // 遊戲模式：hangman＝猜字母（原玩法）；spell＝Spelling 考驗（每個字母自己打、整字送出才比對）
+  var MODE_KEY = 'hangman.mode';
+  function currentMode() {
+    var m = '';
+    try { m = localStorage.getItem(MODE_KEY) || ''; } catch (e) {}
+    return m === 'spell' ? 'spell' : 'hangman';
+  }
+  function isSpell() { return !!state && state.mode === 'spell'; }
+
   var LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
 
   var $ = function (id) { return document.getElementById(id); };
@@ -507,6 +516,7 @@
   function beginGame(queue, label, source) {
     lastSource = source;
     state = {
+      mode: currentMode(),
       source: source,
       label: label,
       queue: queue,
@@ -516,7 +526,7 @@
       results: []
     };
 
-    $('hudDiff').textContent = label;
+    $('hudDiff').textContent = label + (state.mode === 'spell' ? '・Spelling' : '');
     show('game');
     loadRound();
   }
@@ -531,6 +541,16 @@
     state.hintUsed = 0;
     state.locked = false;
     hideNext();
+
+    // Spelling 模式：pos＝單字裡「字母」的位置（空白/連字號自動顯示、不用打）
+    state.pos = [];
+    item.word.split('').forEach(function (ch, i) { if (isLetter(ch)) state.pos.push(i); });
+    state.typed = [];        // 已打的字母（依序）
+    state.badIdx = {};       // 上次送出時錯的格子
+    state.hintIdx = {};      // 用提示填的格子
+    state.attempts = [];     // 送出過的錯誤拼法
+    state.solved = false;
+    $('wrongLabel').textContent = state.mode === 'spell' ? '拼錯過的拼法' : '拼錯過';
 
     var letters = Decks.letterCount(item.word);
     var pieces = item.word.split(/[\s\-]+/).filter(Boolean).length;
@@ -579,12 +599,27 @@
       b.className = 'key';
       b.textContent = ch;
       b.setAttribute('data-letter', ch);
-      b.addEventListener('click', function () { guess(ch); });
+      b.addEventListener('click', function () {
+        if (isSpell()) typeLetter(ch); else guess(ch);
+      });
       kb.appendChild(b);
     });
+    if (isSpell()) {
+      [['⌫', 'key-back', backspace, '刪除一個字母'],
+       ['送出 ✓', 'key-submit', submitSpell, '送出答案']].forEach(function (d) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'key key-wide ' + d[1];
+        b.textContent = d[0];
+        b.title = d[3];
+        b.addEventListener('click', d[2]);
+        kb.appendChild(b);
+      });
+    }
   }
 
   function renderSlots(revealAll) {
+    if (isSpell()) { renderSpellSlots(revealAll); return; }
     var box = $('wordSlots');
     box.innerHTML = '';
     state.word.split('').forEach(function (ch) {
@@ -609,9 +644,50 @@
     });
   }
 
+  /** Spelling 模式的格子：打一個字母顯示一個；游標在下一格；送出後錯的標紅 */
+  function renderSpellSlots(revealAll) {
+    var box = $('wordSlots');
+    box.innerHTML = '';
+    var k = 0;
+    state.word.split('').forEach(function (ch) {
+      if (!isLetter(ch)) {
+        var sep = document.createElement('div');
+        if (ch === ' ') { sep.className = 'slot-space'; }
+        else { sep.className = 'slot-sep'; sep.textContent = ch; }
+        box.appendChild(sep);
+        return;
+      }
+      var d = document.createElement('div');
+      d.className = 'slot';
+      var t = state.typed[k];
+      if (revealAll) {
+        d.textContent = ch;
+        d.className += (t === ch) ? ' filled' : ' reveal';
+      } else if (t) {
+        d.textContent = t;
+        if (state.solved) d.className += ' filled';
+        else if (state.hintIdx[k]) d.className += ' hinted';
+        else if (state.badIdx[k]) d.className += ' typed wrong';
+        else d.className += ' typed';
+      } else if (k === state.typed.length && !state.locked) {
+        d.className += ' cursor';
+      }
+      box.appendChild(d);
+      k++;
+    });
+  }
+
   function renderWrong() {
     var box = $('wrongLetters');
     box.innerHTML = '';
+    if (isSpell()) {
+      state.attempts.forEach(function (w) {
+        var s = document.createElement('span');
+        s.textContent = w;
+        box.appendChild(s);
+      });
+      return;
+    }
     Object.keys(state.guessed).forEach(function (ch) {
       if (state.word.indexOf(ch) === -1) {
         var s = document.createElement('span');
@@ -668,6 +744,75 @@
       markKey(ch, 'miss');
       penalty('拼錯了，繩子上的人又長出一塊…');
     }
+  }
+
+  /* ---------- Spelling 模式 ---------- */
+  function typeLetter(ch) {
+    if (!state || state.locked) return;
+    if (state.typed.length >= state.pos.length) {
+      setMessage('格子已經填滿了，按「送出」或 Enter 對答案（⌫ 可以修改）', 'bad');
+      return;
+    }
+    var k = state.typed.length;
+    state.typed.push(ch);
+    delete state.badIdx[k];
+    renderSlots();
+    setMessage('');
+  }
+
+  function backspace() {
+    if (!state || state.locked || !state.typed.length) return;
+    var k = state.typed.length - 1;
+    state.typed.pop();
+    delete state.badIdx[k];
+    delete state.hintIdx[k];
+    renderSlots();
+    setMessage('');
+  }
+
+  function submitSpell() {
+    if (!state || state.locked) return;
+    var need = state.pos.length - state.typed.length;
+    if (need > 0) {
+      setMessage('還差 ' + need + ' 個字母，全部打完再送出', 'bad');
+      return;
+    }
+    var bad = {}, nBad = 0;
+    state.pos.forEach(function (p, k) {
+      if (state.typed[k] !== state.word[p]) { bad[k] = true; nBad++; }
+    });
+    if (!nBad) {
+      state.solved = true;
+      renderSlots();
+      roundWin();
+      return;
+    }
+    state.badIdx = bad;
+    state.attempts.push(state.typed.join(''));
+    renderSlots();
+    penalty('拼錯了，紅色的 ' + nBad + ' 格不對，改好再送出');
+  }
+
+  /** Spelling 的提示：從第一個錯的（或空的）格子起，填上正確字母，後面的清掉重打 */
+  function useSpellHint() {
+    var k = 0;
+    while (k < state.typed.length && state.typed[k] === state.word[state.pos[k]]) k++;
+    if (k >= state.pos.length) { submitSpell(); return; }
+    var ch = state.word[state.pos[k]];
+    state.typed = state.typed.slice(0, k);
+    state.typed.push(ch);
+    Object.keys(state.hintIdx).forEach(function (i) { if (+i > k) delete state.hintIdx[i]; });
+    state.hintIdx[k] = true;
+    state.badIdx = {};
+    state.hintUsed++;
+    if (state.typed.length === state.pos.length) {
+      state.solved = true;
+      renderSlots();
+      roundWin();
+      return;
+    }
+    renderSlots();
+    penalty('提示：第 ' + (k + 1) + ' 個字母是「' + ch + '」，代價是一次機會');
   }
 
   function penalty(text) {
@@ -792,6 +937,7 @@
   /* ---------- 提示與例句 ---------- */
   function useHint() {
     if (!state || state.locked) return;
+    if (isSpell()) { useSpellHint(); return; }
     var remain = state.word.split('').filter(function (ch) {
       return isLetter(ch) && !state.found[ch];
     });
@@ -922,10 +1068,14 @@
       goNext();
       return;
     }
+    if (isSpell()) {
+      if (e.key === 'Backspace') { e.preventDefault(); backspace(); return; }
+      if (e.key === 'Enter') { e.preventDefault(); submitSpell(); return; }
+    }
     var ch = e.key.toLowerCase();
     if (ch.length === 1 && ch >= 'a' && ch <= 'z') {
       e.preventDefault();
-      guess(ch);
+      if (isSpell()) typeLetter(ch); else guess(ch);
     }
   });
 
@@ -933,6 +1083,26 @@
     Cloud.load().then(renderLineDecks);
     renderLineDecks();
   });
+
+  /* ---------- 遊戲模式切換（吊人／Spelling，題庫共用）---------- */
+  (function initMode() {
+    var btns = document.querySelectorAll('#modeRow .mode-btn');
+    function paint() {
+      var m = currentMode();
+      Array.prototype.forEach.call(btns, function (b) {
+        var on = b.getAttribute('data-mode') === m;
+        b.classList.toggle('is-on', on);
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+    }
+    Array.prototype.forEach.call(btns, function (b) {
+      b.addEventListener('click', function () {
+        try { localStorage.setItem(MODE_KEY, b.getAttribute('data-mode')); } catch (e) {}
+        paint();
+      });
+    });
+    paint();
+  })();
 
   /* ---------- 每局關卡數滾輪 ---------- */
   (function initRounds() {
