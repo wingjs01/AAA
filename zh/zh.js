@@ -259,6 +259,10 @@
       delayBetweenStrokes: 120,
       showHintAfterMisses: 2,           // 同一筆錯 2 次 → 閃一下正確的那一筆
       markStrokeCorrectAfterMisses: 3,  // 錯 3 次 → 直接補上，不讓人卡住
+      // 判定放寬（用戶 09-28 要求）。實測 12 字、每種寫法全筆畫：
+      //   寫歪 78%→92%、字寫小偏一邊 61%→99%；寫成別的筆畫的誤放 1%→6%（2.0 會到 18%，筆順檢查失效）
+      leniency: 1.5,
+      acceptBackwardsStrokes: true,     // 方向寫反也算對（原本一律判錯）
       // 筆順資料從 CDN 下載，網路慢時格子會先空著、寫了沒反應 → 先講「載入中」
       onLoadCharDataSuccess: function () { if ($('msg').textContent === '載入中…') msg(''); },
       onLoadCharDataError: function () {
