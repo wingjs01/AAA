@@ -32,7 +32,6 @@
     start: $('screen-start'),
     deck:  $('screen-deck'),
     game:  $('screen-game'),
-    write: $('screen-write'),
     over:  $('screen-over')
   };
 
@@ -110,12 +109,6 @@
     renderLineDecks();
   }
 
-  /* ---------- 題庫語言：中文生字題庫走寫字遊戲 ---------- */
-  function isZh(deck) { return !!deck && deck.lang === 'zh'; }
-  function deckBadge(deck) {
-    return isZh(deck) ? '<span class="lang-badge">✏️ 寫國字</span>' : '';
-  }
-
   /* ---------- 公開題庫（任何人都能玩，卡片標示上傳者）---------- */
   function renderPublicDecks() {
     var head = $('publicHead');
@@ -140,8 +133,8 @@
       row.innerHTML =
         '<span class="dot dot-line"></span>' +
         '<span class="d-text">' +
-          '<span class="d-name">' + deckBadge(deck) + esc(deck.name) + '</span>' +
-          '<span class="d-desc">' + deck.word_count + (isZh(deck) ? ' 個生字・' : ' 個單字・') +
+          '<span class="d-name">' + esc(deck.name) + '</span>' +
+          '<span class="d-desc">' + deck.word_count + ' 個單字・' +
             (rounds ? '一局 ' + rounds + ' 關' : '還沒有單字') +
             '・由 ' + esc(deck.owner || '匿名') + ' 分享</span>' +
         '</span>' +
@@ -150,8 +143,7 @@
         '</span>';
       row.addEventListener('click', function (e) {
         if (e.target.getAttribute && e.target.getAttribute('data-act') === 'playpub') {
-          startGame({ kind: 'public', pubId: deck.id, lang: deck.lang || 'en',
-                      name: deck.name + '（' + (deck.owner || '匿名') + '）' });
+          startGame({ kind: 'public', pubId: deck.id, name: deck.name + '（' + (deck.owner || '匿名') + '）' });
         }
       });
       box.appendChild(row);
@@ -196,8 +188,8 @@
       row.innerHTML =
         '<span class="dot dot-line"></span>' +
         '<span class="d-text">' +
-          '<span class="d-name">' + deckBadge(deck) + esc(deck.name) + '</span>' +
-          '<span class="d-desc">' + deck.word_count + (isZh(deck) ? ' 個生字・' : ' 個單字・') +
+          '<span class="d-name">' + esc(deck.name) + '</span>' +
+          '<span class="d-desc">' + deck.word_count + ' 個單字・' +
             (rounds ? '一局 ' + rounds + ' 關' : '還沒有單字') + '</span>' +
         '</span>' +
         '<span class="card-actions">' +
@@ -205,7 +197,7 @@
         '</span>';
       row.addEventListener('click', function (e) {
         if (e.target.getAttribute && e.target.getAttribute('data-act') === 'play') {
-          startGame({ kind: 'cloud', deckId: deck.id, name: deck.name, lang: deck.lang || 'en' });
+          startGame({ kind: 'cloud', deckId: deck.id, name: deck.name });
         }
       });
       box.appendChild(row);
@@ -480,8 +472,7 @@
       Cloud.loadWords(source.deckId).then(function (words) {
         renderLineDecks();
         if (!words.length) { window.alert('這個題庫還沒有單字。'); return; }
-        var go = source.lang === 'zh' ? beginWrite : beginGame;
-        go(shuffle(words).slice(0, Math.min(currentRounds(), words.length)), source.name, source);
+        beginGame(shuffle(words).slice(0, Math.min(currentRounds(), words.length)), source.name, source);
       }).catch(function (err) {
         renderLineDecks();
         window.alert('載入題庫失敗：' + err.message);
@@ -495,8 +486,7 @@
       Cloud.loadPublicWords(source.pubId).then(function (words) {
         renderPublicDecks();
         if (!words.length) { window.alert('這個公開題庫還沒有單字。'); return; }
-        var go = source.lang === 'zh' ? beginWrite : beginGame;
-        go(shuffle(words).slice(0, Math.min(currentRounds(), words.length)), source.name, source);
+        beginGame(shuffle(words).slice(0, Math.min(currentRounds(), words.length)), source.name, source);
       }).catch(function (err) {
         renderPublicDecks();
         window.alert('載入公開題庫失敗：' + err.message);
@@ -880,22 +870,16 @@
   /* ---------- 「下一題」按鈕 ---------- */
   var nextAction = null;
 
-  // 英文遊戲與寫字遊戲各有一顆，同一時間只會有一個畫面在前面
-  var NEXT_UI = [['nextRow', 'btnNext'], ['wNextRow', 'btnWNext']];
-
   function showNext(label, fn) {
     nextAction = fn;
-    NEXT_UI.forEach(function (u) {
-      $(u[1]).textContent = label;
-      $(u[0]).hidden = false;
-    });
-    var btn = screens.write.classList.contains('is-active') ? $('btnWNext') : $('btnNext');
-    btn.focus();
+    $('btnNext').textContent = label;
+    $('nextRow').hidden = false;
+    $('btnNext').focus();
   }
 
   function hideNext() {
     nextAction = null;
-    NEXT_UI.forEach(function (u) { $(u[0]).hidden = true; });
+    $('nextRow').hidden = true;
   }
 
   function goNext() {
@@ -924,15 +908,12 @@
   function gameOver(win) {
     var cleared = state.results.filter(function (r) { return r.ok; }).length;
 
-    var writing = state.mode === 'write';
-    $('overIcon').textContent = win ? (writing ? '✏️' : '🏆') : '💀';
-    $('overTitle').textContent = win ? (writing ? '全部寫完了！' : '全部通關！') : '通關失敗';
+    $('overIcon').textContent = win ? '🏆' : '💀';
+    $('overTitle').textContent = win ? '全部通關！' : '通關失敗';
     $('overTitle').className = 'over-title ' + (win ? 'win' : 'lose');
-    $('overText').textContent = writing
-      ? '「' + state.label + '」的 ' + state.queue.length + ' 個生字都寫完了。'
-      : win
-        ? '你用「' + state.label + '」救下了所有人。'
-        : '第 ' + (state.round + 1) + ' 關被吊死，挑戰到此結束。';
+    $('overText').textContent = win
+      ? '你用「' + state.label + '」救下了所有人。'
+      : '第 ' + (state.round + 1) + ' 關被吊死，挑戰到此結束。';
 
     $('finalScore').textContent = state.score;
     $('finalCleared').textContent = cleared + ' / ' + state.queue.length;
@@ -946,234 +927,11 @@
       row.innerHTML =
         '<span class="rw-word">' + esc(r.word) + '</span>' +
         '<span class="rw-zh">' + esc(r.zh || '') + '</span>' +
-        '<span class="rw-mark">' + (!r.ok ? '失敗'
-          : writing ? (r.wrong ? '錯 ' + r.wrong + ' 筆' : '全對') + (r.hint ? '・看筆順 ' + r.hint + ' 次' : '')
-          : '過關・錯 ' + r.wrong + ' 次') + '</span>';
+        '<span class="rw-mark">' + (r.ok ? '過關・錯 ' + r.wrong + ' 次' : '失敗') + '</span>';
       list.appendChild(row);
     });
 
     show('over');
-  }
-
-  /* =========================================================
-     中文生字：看注音寫國字（Hanzi Writer 逐筆檢查筆順）
-     - 一題＝一個詞，一格一格寫；寫錯只提示、不扣機會，錯的筆數影響分數
-     - 同一筆錯 3 次自動補上（markStrokeCorrectAfterMisses），
-       避免台灣與大陸筆順不同的字把小朋友卡死
-     ========================================================= */
-  var HW_SRC = 'https://cdn.jsdelivr.net/npm/hanzi-writer@3.7.3/dist/hanzi-writer.min.js';
-  var hwLoading = null;
-
-  function loadHanziWriter() {
-    if (window.HanziWriter) return Promise.resolve();
-    if (!hwLoading) {
-      hwLoading = new Promise(function (resolve, reject) {
-        var sc = document.createElement('script');
-        sc.src = HW_SRC;
-        sc.onload = function () { resolve(); };
-        sc.onerror = function () { hwLoading = null; reject(new Error('寫字元件載入失敗，請檢查網路')); };
-        document.head.appendChild(sc);
-      });
-    }
-    return hwLoading;
-  }
-
-  function beginWrite(queue, label, source) {
-    lastSource = source;
-    loadHanziWriter().then(function () {
-      state = {
-        mode: 'write',
-        source: source,
-        label: label,
-        queue: queue,
-        round: 0,
-        score: 0,
-        perfect: 0,
-        results: []
-      };
-      $('wDeck').textContent = label;
-      show('write');
-      loadWriteRound();
-    }).catch(function (err) { window.alert(err.message); });
-  }
-
-  function wMsg(text, kind) {
-    var el = $('wMsg');
-    el.textContent = text || '';
-    el.className = 'message' + (kind ? ' ' + kind : '');
-  }
-
-  function loadWriteRound() {
-    var item = state.queue[state.round];
-    state.word = item.word;
-    state.chars = Array.from(item.word);
-    state.zy = item.zhuyin || [];
-    state.ci = 0;
-    state.wrong = 0;
-    state.hintUsed = 0;
-    state.locked = false;
-    hideNext();
-
-    $('wRound').textContent = (state.round + 1) + ' / ' + state.queue.length;
-    $('wScore').textContent = state.score;
-    $('btnWHint').disabled = false;
-    $('btnWRedo').disabled = false;
-    wMsg('');
-    renderWriteCells();
-    startChar();
-  }
-
-  /** 上方一排格子：每格上面是注音，寫完的字填進去，目前這格亮起來 */
-  function renderWriteCells() {
-    var box = $('wCells');
-    box.innerHTML = '';
-    state.chars.forEach(function (ch, i) {
-      var cell = document.createElement('div');
-      cell.className = 'w-cell' + (i < state.ci ? ' done' : (i === state.ci && !state.locked ? ' current' : ''));
-      cell.innerHTML =
-        '<span class="w-zy">' + esc(state.zy[i] || '') + '</span>' +
-        '<span class="w-ch">' + (i < state.ci ? esc(ch) : '') + '</span>';
-      box.appendChild(cell);
-    });
-  }
-
-  function writerSize() {
-    var w = $('wPadWrap').clientWidth || 300;
-    return Math.max(200, Math.min(300, w - 8));
-  }
-
-  function startChar() {
-    var ch = state.chars[state.ci];
-    var pad = $('wPad');
-    var size = writerSize();
-    pad.innerHTML = '';
-    pad.style.width = size + 'px';
-    pad.style.height = size + 'px';
-    wMsg('載入中…');
-    state.writer = HanziWriter.create(pad, ch, {
-      width: size,
-      height: size,
-      padding: 14,
-      showCharacter: false,
-      showOutline: false,
-      strokeColor: '#47c98a',
-      drawingColor: '#e7ecf5',
-      highlightColor: '#f5b544',
-      drawingWidth: 22,
-      strokeAnimationSpeed: 3,          // 看筆順動畫：預設 14 筆的「銀」要播快 20 秒 → 加快到約 5 秒
-      delayBetweenStrokes: 120,
-      showHintAfterMisses: 2,           // 同一筆錯 2 次 → 閃一下正確的那一筆
-      markStrokeCorrectAfterMisses: 3,  // 錯 3 次 → 直接補上，不讓人卡住
-      // 筆順資料從 CDN 下載，網路慢時格子會先空著、寫了沒反應 → 先講「載入中」
-      onLoadCharDataSuccess: function () {
-        if ($('wMsg').textContent === '載入中…') wMsg('');
-      },
-      onLoadCharDataError: function () {
-        // 少數字沒有筆順資料：直接顯示答案、算這個字過關，不讓整題卡死
-        wMsg('「' + ch + '」沒有筆順資料，先幫你寫上', 'bad');
-        setTimeout(charDone, 900);
-      }
-    });
-    quizChar();
-  }
-
-  // ⚠️ 同一筆第 3 次錯時 Hanzi Writer 不呼叫 onMistake，而是直接當成寫對（onCorrectStroke、
-  //    mistakesOnStroke=2）並補上那一筆——分不出「真的寫對」還是「被補上」，訊息用中性說法。
-  function quizChar() {
-    state.writer.quiz({
-      onMistake: function (sd) {
-        state.wrong++;
-        wMsg(sd.mistakesOnStroke >= 2 ? '看一下閃出來的提示，照著寫' : '這一筆不對，再試試看', 'bad');
-      },
-      onCorrectStroke: function (sd) {
-        wMsg(sd.mistakesOnStroke >= 2 ? '好，這一筆過了，繼續寫下一筆' : '');
-      },
-      onComplete: function () { setTimeout(charDone, 350); }
-    });
-  }
-
-  function charDone() {
-    if (!state || state.mode !== 'write' || state.locked) return;
-    state.ci++;
-    if (state.ci < state.chars.length) {
-      renderWriteCells();
-      wMsg('');
-      startChar();
-      return;
-    }
-    wordDone();
-  }
-
-  function wordDone() {
-    state.locked = true;
-    renderWriteCells();
-    $('btnWHint').disabled = true;
-    $('btnWRedo').disabled = true;
-
-    var gained = Math.max(20, 100 - state.wrong * 5 - state.hintUsed * 25);
-    var flawless = (state.wrong === 0 && state.hintUsed === 0);
-    if (flawless) { gained += 30; state.perfect++; }
-    state.score += gained;
-    $('wScore').textContent = state.score;
-    state.results.push({ word: state.word, zh: state.zy.join(' '), ok: true,
-                         wrong: state.wrong, hint: state.hintUsed });
-    sfx.win();
-    wMsg((flawless ? '完美！一筆都沒錯 ' : '寫完了！ ') + '+' + gained + ' 分', 'good');
-
-    var last = state.round + 1 >= state.queue.length;
-    showNext(last ? '看結果 🏆' : '下一題 ▶', function () {
-      state.round++;
-      if (state.round >= state.queue.length) gameOver(true);
-      else loadWriteRound();
-    });
-  }
-
-  /** 💡 看筆順：播一次這個字的寫法，播完這個字從頭再寫（扣分） */
-  function writeHint() {
-    if (!state || state.mode !== 'write' || state.locked || !state.writer) return;
-    state.hintUsed++;
-    $('btnWHint').disabled = true;
-    $('btnWRedo').disabled = true;
-    wMsg('看好筆順，等一下自己寫一次');
-    var writer = state.writer;
-    var finished = false;
-    function backToQuiz() {
-      if (finished) return;
-      finished = true;
-      clearTimeout(guard);
-      setTimeout(function () {
-        if (!state || state.locked || state.writer !== writer) return;
-        try { writer.cancelAnimation && writer.cancelAnimation(); } catch (e) {}
-        writer.hideCharacter();
-        $('btnWHint').disabled = false;
-        $('btnWRedo').disabled = false;
-        wMsg('換你寫');
-        quizChar();
-      }, 500);
-    }
-    // ⚠️ 保險：動畫靠 requestAnimationFrame，手機切到別的 App／分頁被藏起來時會停住、
-    //    onComplete 永遠不來 → 按鈕一直是灰的、整題卡死（本機測試實際踩到）。逾時就強制回到寫字。
-    var guard = setTimeout(backToQuiz, 15000);
-    writer.cancelQuiz();
-    writer.animateCharacter({ onComplete: backToQuiz });
-  }
-
-  function writeRedo() {
-    if (!state || state.mode !== 'write' || state.locked || !state.writer) return;
-    state.writer.cancelQuiz();
-    wMsg('這個字重新寫');
-    quizChar();
-  }
-
-  function speakZh() {
-    if (!state || !state.word || !window.speechSynthesis) return;
-    try {
-      var u = new SpeechSynthesisUtterance(state.word);
-      u.lang = 'zh-TW';
-      u.rate = 0.8;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch (e) {}
   }
 
   /* ---------- 提示與例句 ---------- */
@@ -1289,18 +1047,6 @@
   $('btnHint').addEventListener('click', useHint);
   $('btnSentence').addEventListener('click', showSentence);
   $('btnNext').addEventListener('click', goNext);
-  $('btnWNext').addEventListener('click', goNext);
-  $('btnWHint').addEventListener('click', writeHint);
-  $('btnWRedo').addEventListener('click', writeRedo);
-  $('btnWSpeak').addEventListener('click', speakZh);
-  $('btnWQuit').addEventListener('click', function () {
-    if (!state) return;
-    if (window.confirm('放棄這一局？目前分數不會保留。')) {
-      state.locked = true;
-      if (state.writer) { try { state.writer.cancelQuiz(); } catch (e) {} }
-      renderStart(); show('start');
-    }
-  });
 
   $('btnQuit').addEventListener('click', function () {
     if (!state) return;
@@ -1315,10 +1061,6 @@
 
   // 實體鍵盤
   document.addEventListener('keydown', function (e) {
-    if (screens.write.classList.contains('is-active')) {
-      if (nextAction && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goNext(); }
-      return;
-    }
     if (!screens.game.classList.contains('is-active')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (nextAction && (e.key === 'Enter' || e.key === ' ')) {
