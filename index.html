@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>單字吊人</title>
-<!-- 改了 JS/CSS 就把 ?v= 換成當天日期：強迫瀏覽器抓新版，避免新頁面配到快取的舊程式 -->
-<link rel="stylesheet" href="styles.css?v=20260928">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -206,40 +205,6 @@
   </section>
 
   <!-- ===== 結算畫面 ===== -->
-  <!-- ===== 中文生字：看注音寫國字 ===== -->
-  <section id="screen-write" class="screen">
-    <header class="hud">
-      <div class="hud-item"><span class="hud-label">關卡</span><span id="wRound" class="hud-value">1 / 5</span></div>
-      <div class="hud-item hud-grow"><span class="hud-label">題庫</span><span id="wDeck" class="hud-value">生字</span></div>
-      <div class="hud-item"><span class="hud-label">分數</span><span id="wScore" class="hud-value">0</span></div>
-      <button id="btnWQuit" class="btn btn-ghost btn-sm" type="button">放棄</button>
-    </header>
-
-    <div class="write-panel">
-      <div class="write-top">
-        <span class="write-tip">看注音，一筆一筆寫出國字</span>
-        <button id="btnWSpeak" class="btn btn-icon" type="button" title="念一次" aria-label="念一次">🔊</button>
-      </div>
-
-      <div id="wCells" class="w-cells" aria-live="polite"></div>
-
-      <div id="wPadWrap" class="w-pad-wrap">
-        <div id="wPad" class="w-pad"></div>
-      </div>
-
-      <div id="wMsg" class="message"></div>
-
-      <div id="wNextRow" class="next-row" hidden>
-        <button id="btnWNext" class="btn btn-primary btn-next" type="button">下一題 ▶</button>
-      </div>
-
-      <div class="actions">
-        <button id="btnWHint" class="btn btn-ghost" type="button">💡 看筆順（扣分）</button>
-        <button id="btnWRedo" class="btn btn-ghost" type="button">↺ 這個字重寫</button>
-      </div>
-    </div>
-  </section>
-
   <section id="screen-over" class="screen">
     <div id="overIcon" class="over-icon">💀</div>
     <h2 id="overTitle" class="over-title">通關失敗</h2>
@@ -261,11 +226,11 @@
 
 </div>
 
-<script src="config.js?v=20260928"></script>
-<script src="words.js?v=20260928"></script>
-<script src="cloud.js?v=20260928"></script>
-<script src="ipa.js?v=20260928"></script>
-<script src="decks.js?v=20260928"></script>
-<script src="game.js?v=20260928"></script>
+<script src="config.js"></script>
+<script src="words.js"></script>
+<script src="cloud.js"></script>
+<script src="ipa.js"></script>
+<script src="decks.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
