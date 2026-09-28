@@ -141,21 +141,19 @@ var Cloud = (function () {
   /** 公開題庫的單字。 */
   function loadPublicWords(pubId) {
     return get('/api/public/' + encodeURIComponent(pubId)).then(function (data) {
-      return (data.words || []).map(mapWord);
+      return (data.words || []).map(function (w) {
+        return { word: w.word, zh: w.zh || '', ipa: w.ipa || '', hint: w.hint || '' };
+      });
     });
   }
 
   function loadWords(deckId) {
     return get('/api/deck/' + deckId + '?t=' + encodeURIComponent(state.token))
       .then(function (data) {
-        return (data.words || []).map(mapWord);
+        return (data.words || []).map(function (w) {
+          return { word: w.word, zh: w.zh || '', ipa: w.ipa || '', hint: w.hint || '' };
+        });
       });
-  }
-
-  /** 後端單字 → 遊戲格式。中文生字多一個 zhuyin（逐字注音陣列）。 */
-  function mapWord(w) {
-    return { word: w.word, zh: w.zh || '', ipa: w.ipa || '', hint: w.hint || '',
-             zhuyin: w.zhuyin || [] };
   }
 
   return {
