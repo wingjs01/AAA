@@ -256,59 +256,6 @@ body {
 /* 每題結束後的「下一題」：玩家看完答案自己點，不再自動跳 */
 .next-row { display: flex; justify-content: center; margin: 4px 0 12px; }
 .next-row[hidden] { display: none; }
-
-/* ---------- 中文生字：看注音寫國字 ---------- */
-.lang-badge {
-  display: inline-block; margin-right: 6px; padding: 1px 7px;
-  font-size: 11px; font-weight: 700; vertical-align: 2px;
-  color: var(--accent); background: var(--accent-soft);
-  border: 1px solid var(--accent); border-radius: 999px;
-}
-.write-panel {
-  max-width: 560px; margin: 0 auto;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 18px;
-}
-.write-top { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 14px; }
-.w-cells { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 14px 0 16px; }
-.w-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.w-zy {
-  font-size: 20px; font-weight: 700; color: var(--accent); letter-spacing: .04em;
-  min-height: 28px; white-space: nowrap;
-}
-.w-ch {
-  width: 58px; height: 58px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 36px; font-weight: 700;
-  background: var(--bg-soft);
-  border: 2px solid var(--line);
-  border-radius: 10px;
-}
-.w-cell.current .w-ch { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.w-cell.done .w-ch { border-color: var(--good); color: var(--good); animation: pop .3s ease; }
-.w-pad-wrap { display: flex; justify-content: center; }
-.w-pad {
-  width: 300px; height: 300px;
-  border: 2px solid var(--line);
-  border-radius: 12px;
-  touch-action: none;                 /* 手機上寫字時不要捲動頁面 */
-  /* 田字格：中間十字虛線 */
-  background-image:
-    repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px),
-    repeating-linear-gradient(0deg, var(--line) 0 6px, transparent 6px 12px);
-  background-size: 100% 1px, 1px 100%;
-  background-position: 0 50%, 50% 0;
-  background-repeat: no-repeat;
-  background-color: var(--bg-soft);
-}
-.w-pad svg { display: block; }
-@media (max-width: 520px) {
-  .write-panel { padding: 14px 12px; }
-  .w-ch { width: 48px; height: 48px; font-size: 30px; }
-  .w-zy { font-size: 17px; }
-}
 .btn-next { min-width: 180px; padding: 12px 24px; font-size: 17px; }
 
 /* ---------- 鍵盤 ---------- */
