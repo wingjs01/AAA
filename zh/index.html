@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>國字練習</title>
+<!-- 改了 JS/CSS 就把 ?v= 換成當天日期：強迫瀏覽器抓新版，避免新頁面配到快取的舊程式 -->
+<link rel="stylesheet" href="zh.css?v=20260928">
+</head>
+<body>
+<main class="app">
+
+  <!-- ===== 開始畫面 ===== -->
+  <section id="screen-start" class="screen is-active">
+    <h1 class="title">國字練習</h1>
+    <p class="subtitle">看注音，一筆一筆寫出國字。<br>筆順寫錯會提醒你，寫完一個詞按「下一題」。</p>
+
+    <div class="section-head"><span>每次練習幾題</span></div>
+    <div class="rounds-row">
+      <input id="roundsRange" type="range" min="5" max="100" step="1" value="10" aria-label="每次練習幾題">
+      <span id="roundsValue" class="rounds-value">10</span>
+      <span class="rounds-hint">題（題庫不夠時，以實際詞數為準）</span>
+    </div>
+
+    <div class="section-head"><span>我的生字題庫</span>
+      <button id="btnRefresh" class="btn btn-sm" type="button">重新整理</button></div>
+    <div id="myDecks" class="deck-list"></div>
+
+    <div id="publicHead" class="section-head" hidden><span>公開生字題庫</span></div>
+    <div id="publicDecks" class="deck-list" hidden></div>
+
+    <div class="howto">
+      <div class="howto-title">怎麼加生字</div>
+      在 LINE 傳給美里：<b>生字 第一課 蘋果 太陽 花園</b><br>
+      注音不對可以指定：<b>生字 銀行(ㄧㄣˊ ㄏㄤˊ)</b><br>
+      拿練習連結：<b>!生字 測驗</b>
+    </div>
+  </section>
+
+  <!-- ===== 寫字畫面 ===== -->
+  <section id="screen-write" class="screen">
+    <header class="hud">
+      <div class="hud-item"><span class="hud-label">題目</span><span id="hudRound" class="hud-value">1 / 5</span></div>
+      <div class="hud-item hud-grow"><span class="hud-label">題庫</span><span id="hudDeck" class="hud-value">生字</span></div>
+      <div class="hud-item"><span class="hud-label">分數</span><span id="hudScore" class="hud-value">0</span></div>
+      <button id="btnQuit" class="btn btn-ghost btn-sm" type="button">結束</button>
+    </header>
+
+    <div class="panel">
+      <div class="top-row">
+        <span class="tip">看注音，一筆一筆寫出國字</span>
+        <button id="btnSpeak" class="btn btn-icon" type="button" title="念一次" aria-label="念一次">🔊</button>
+      </div>
+
+      <div id="cells" class="cells" aria-live="polite"></div>
+
+      <div id="padWrap" class="pad-wrap">
+        <div id="pad" class="pad"></div>
+      </div>
+
+      <div id="msg" class="message"></div>
+
+      <div id="nextRow" class="next-row" hidden>
+        <button id="btnNext" class="btn btn-primary btn-next" type="button">下一題 ▶</button>
+      </div>
+
+      <div class="actions">
+        <button id="btnHint" class="btn btn-ghost" type="button">💡 看筆順（扣分）</button>
+        <button id="btnRedo" class="btn btn-ghost" type="button">↺ 這個字重寫</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 結算畫面 ===== -->
+  <section id="screen-over" class="screen">
+    <div class="over-icon">✏️</div>
+    <h2 class="over-title">全部寫完了！</h2>
+    <p id="overText" class="over-text"></p>
+    <div class="score-card">
+      <div><span class="sc-label">總分</span><span id="finalScore" class="sc-value">0</span></div>
+      <div><span class="sc-label">寫完</span><span id="finalDone" class="sc-value">0</span></div>
+      <div><span class="sc-label">一筆都沒錯</span><span id="finalPerfect" class="sc-value">0</span></div>
+    </div>
+    <div id="reviewList" class="review-list"></div>
+    <div class="over-actions">
+      <button id="btnRetry" class="btn btn-primary" type="button">再練一次</button>
+      <button id="btnHome" class="btn btn-ghost" type="button">回到選單</button>
+    </div>
+  </section>
+
+</main>
+
+<script src="config.js?v=20260928"></script>
+<script src="zh.js?v=20260928"></script>
+</body>
+</html>
